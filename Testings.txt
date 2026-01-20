@@ -1,0 +1,1008 @@
+# First Testing Demo with Piezo Elements
+
+I followed for this first testing/demo this tutorial on Youtube: 
+
+https://www.youtube.com/watch?v=wMjCMAXF9CI
+
+1. **wired-up one piezo element to my arduino board along with a LED**
+
+1.1 ‼️ had problems with Arduino so I started off with just trying to blink a LED again
+
+***Coding part:***
+
+```
+void setup() {
+  pinMode(7, OUTPUT);
+}
+
+void loop() {
+  digitalWrite(7, HIGH);
+  delay(1000);
+  digitalWrite(7, LOW);
+  delay(1000);
+}
+```
+
+It worked, so my Arduino is still working and nothing is wrong
+
+1.2 ‼️ Now trying again the hardware build-up while following the tutorial
+
+***Coding part:***
+
+```
+void setup() {
+Serial.begin(9600);
+for (byte a = 2; a <= 6; a++) {
+  pinMode(a, OUTPUT);
+}
+}
+
+void loop() {
+int value = analogRead(A1);
+Serial.println(value);
+
+for (int a = 1; a <= 5; a++) {
+  if (value > a * 20) {
+    digitalWrite(a + 1, HIGH);
+  } else {
+    digitalWrite(a + 1, LOW);
+  }
+}
+}
+```
+
+Nothing worked here, i looked into the right resistor (i used the right one), i tried flipping the sensor cables (did nothing) 
+
+1.3 ‼️ Now trying again the hardware build-up while following the Arduino IDE documentation to detect a knock: https://docs.arduino.cc/built-in-examples/sensors/Knock/
+
+***Coding part:***
+
+```
+const int ledPin = 13;
+const int knockSensor = A0;
+const int threshold = 100;
+int sensorReading = 0;
+int ledState = LOW;
+void setup() { 
+  pinMode(ledPin, OUTPUT); 
+  Serial.begin(9600);
+  } 
+  
+void loop() {
+sensorReading = analogRead(knockSensor);
+if (sensorReading >= threshold) {
+ledState = !ledState;
+digitalWrite(ledPin, ledState);
+Serial.println("Knock!"); 
+} 
+delay(100);
+}
+```
+
+I found the Arduino documentation in the comments of another youtube: https://www.youtube.com/watch?v=1SNC3ib10_4. In the Serial Monitor I got “Knock!” but it was just repeatedly coming in the serial monitor even when i didn’t knock on the sensor, it even kept coming in when i disconnected the sensor
+
+1.4 ‼️ Now trying again the hardware build-up while following the Arduino IDE documentation to detect a knock + a LED that light’s up when a knock is detected
+
+***Coding part:***
+
+```
+const int ledPin = 14;
+const int knockSensor = A0;
+const int threshold = 150;
+const int flickerCount = 5;
+const int flickerDelay = 50;
+
+int lastSensorReading = 0;
+const int noiseMargin = 20;
+
+void setup() {
+  pinMode(ledPin, OUTPUT);
+  Serial.begin(9600);
+}
+
+void loop() {
+  int sensorReading = analogRead(knockSensor);
+
+  if (sensorReading >= threshold && abs(sensorReading - lastSensorReading) > noiseMargin) {
+    Serial.println("Knock!");
+
+    for (int i = 0; i < flickerCount; i++) {
+      digitalWrite(ledPin, HIGH);
+      delay(flickerDelay);
+      digitalWrite(ledPin, LOW);
+      delay(flickerDelay);
+    }
+  }
+
+  lastSensorReading = sensorReading;
+  delay(50);
+}
+```
+
+In the Serial Monitor I got “Knock!” but it was just repeatedly coming in the serial monitor even when i didn’t knock on the sensor, it even kept coming in when i disconnected the sensor + the LED kept flikkering along with the “Knock!” coming in the serial monitor, and it kept going even when i disconnected the sensor → so something doesn’t add up.
+
+1.5 ✅ With a little help of AI I tried again. Now trying again the hardware build-up while following the Arduino IDE documentation to detect a knock + a LED that light’s up when a knock is detected https://chatgpt.com/c/695d1175-d258-8333-84c9-1d1c70d11571
+
+I placed a 47k resistor between the LED and the GND and removed the resistor between the GND and the piezo sensor, so the piezo sensor goes directly to GND
+
+***Coding part:***
+
+```
+const int ledPin = 9;
+const int knockSensor = A0;
+const int threshold = 200;
+bool knockReady = true; // sensor must go below threshold first
+
+void setup() {
+  pinMode(ledPin, OUTPUT);
+  Serial.begin(9600);
+}
+
+void loop() {
+  int sensorReading = analogRead(knockSensor);
+
+  if (knockReady && sensorReading > threshold) {
+    Serial.println("Knock!");
+
+    // Flicker LED
+    for (int i = 0; i < 5; i++) {
+      digitalWrite(ledPin, HIGH);
+      delay(40);
+      digitalWrite(ledPin, LOW);
+      delay(40);
+    }
+
+    knockReady = false; // wait for sensor to go low before next knock
+  }
+
+  // Reset ready state when sensor reading drops
+  if (sensorReading < threshold / 2) {
+    knockReady = true;
+  }
+}
+
+```
+
+Now when I tap the piezo sensor the LED flikkers, i changed the code so that the treshold is higher to ingore noise because piezo sensors can detect sensitive noises even vibration and electric noise. I added noiseMargin so that the sensor only detects real knocks, i use lastSensorReading to store the previous sensor reading so the new one can be compared to the previous one and only count as a real knock when the values are close to each other.
+
+1. **wired-up two piezo element to my Arduino board each one along with a LED**
+
+2.1 ✅ Now trying to add another piezo sensor that flikkers a new LED to the previous arduino setup, so in the hardware setup we have 2 piezo sensors that each flikkers there own LED.
+
+Nothing worked here, i looked into the right resistor (i used the right one), i tried flipping the sensor cables (did nothing) 
+
+***Coding part:***
+
+```
+const int piezo1 = A0;
+const int piezo2 = A1;
+
+const int led1 = 9;
+const int led2 = 8;
+
+const int threshold = 300;
+const int noiseMargin = 20;
+const int flickerCount = 5;
+const int flickerDelay = 50;
+
+int lastReading1 = 0;
+int lastReading2 = 0;
+
+void setup() {
+  pinMode(led1, OUTPUT);
+  pinMode(led2, OUTPUT);
+  Serial.begin(9600);
+}
+
+void loop() {
+  int reading1 = analogRead(piezo1);
+  int reading2 = analogRead(piezo2);
+
+  if (reading1 >= threshold && abs(reading1 - lastReading1) > noiseMargin) {
+    Serial.println("Knock detected on A0!");
+    // Flicker LED1
+    for (int i = 0; i < flickerCount; i++) {
+      digitalWrite(led1, HIGH);
+      delay(flickerDelay);
+      digitalWrite(led1, LOW);
+      delay(flickerDelay);
+    }
+  }
+
+  if (reading2 >= threshold && abs(reading2 - lastReading2) > noiseMargin) {
+    Serial.println("Knock detected on A1!");
+    for (int i = 0; i < flickerCount; i++) {
+      digitalWrite(led2, HIGH);
+      delay(flickerDelay);
+      digitalWrite(led2, LOW);
+      delay(flickerDelay);
+    }
+  }
+
+  lastReading1 = reading1;
+  lastReading2 = reading2;
+
+  delay(50);
+}
+```
+
+I updated the code so that each piezo sensor flikkers it’s own LED when getting a knock/tap. I also made the treshold higher because the sensors were still to sensitive and were capturing more vibrations etc… then a knock. There are still some bugs because sometimes de LED’s flikker when the sensors are not getting tapped and sometimes they flikker multiple times after each other
+
+# Second Testing Demo with Piezo Elements
+
+1. **wired-up one piezo element to my arduino board and try to make sure when tapping the sensor there is a sound produced/created that plays from my computer. I followed this tutorial:** https://www.youtube.com/watch?v=LZp2r3RUEj4&t=7s **+ the help of AI:** https://chatgpt.com/c/695e2f99-0704-8330-b724-f4e2fabb80fc
+
+***Coding part:*** 
+
+```
+#include "MIDIUSB.h"
+
+const int piezoPin = A0;
+const int threshold = 70;
+const int note = 36;
+unsigned long lastHit = 0;
+const int debounceTime = 20;
+
+void setup() {
+}
+
+int peak = 0;
+bool isHit = false;
+
+void loop() {
+  int value = analogRead(piezoPin);
+
+  if (value > peak) {
+    peak = value;
+  }
+
+  if (value > threshold && !isHit) {
+    isHit = true;
+    peak = value;
+  }
+
+  if (isHit && value < threshold / 2) {
+    int velocity = map(peak, threshold, 900, 40, 127);
+    velocity = constrain(velocity, 40, 127);
+
+    noteOn(note, velocity);
+    delay(5);
+    noteOff(note);
+
+    isHit = false;
+    peak = 0;
+  }
+
+  delay(2);
+}
+
+void noteOn(byte pitch, byte velocity) {
+  midiEventPacket_t event = {0x09, 0x90, pitch, velocity};
+  MidiUSB.sendMIDI(event);
+  MidiUSB.flush();
+}
+
+void noteOff(byte pitch) {
+  midiEventPacket_t event = {0x08, 0x80, pitch, 0};
+  MidiUSB.sendMIDI(event);
+  MidiUSB.flush();
+}
+```
+
+I searched for an alternative on the web for loopMidi because loopMidi is for windows, mac has already a build in Audio MIDI setup so that’s handy. Now the program were i send the MIDI signals to isn’t Ableton because it’s not free, but Garageband is already on iOS and is easy to use on Macbook. now in Audio MIDI I setup my Arduino MIDI signals and then in Garageband i make sure that those MIDI signals come in and are linked to a drumkit and in my Arduino code I set the note to 36 because that’s the note for a standard drum kick. Inside Arduino I installed MIDIUSB because with Arduino Micro you can use this build-in and that makes sure that my mac sees the Arduino as an midi controller. The only thing is that the sound/note that is produced when i tap the sensor is still not clear and pure, so i still have to make some changes to make sure i have pure and clear sounds per sensor and not rumbling sounds thru each other.
+
+# Third Testing Demo with Piezo Elements
+
+1. **wired-up two piezo element to my arduino board and try to make different sounds for the different piezo elements with MIDI thru Garageband when giving vibration to the piezo elements**
+
+The piezo sensor wires are very tiny and small so they won’t stay that easy in the board so on the piezo sensors I extended the wires with wago’s and each one an half of a standard arduino wire so they pin easily in the board
+
+***Coding part:***
+
+```
+#include "MIDIUSB.h"
+
+const int kickPin  = A0;
+const int snarePin = A1;
+
+const int threshold = 70;
+const int kickNote  = 36;   // C1
+const int snareNote = 38;   // D1
+
+int peakKick  = 0;
+int peakSnare = 0;
+bool kickHit  = false;
+bool snareHit = false;
+
+void setup() {
+}
+
+void loop() {
+  handlePiezo(kickPin,  kickNote,  peakKick,  kickHit);
+  handlePiezo(snarePin, snareNote, peakSnare, snareHit);
+  delay(2);
+}
+
+void handlePiezo(int pin, int note, int &peak, bool &isHit) {
+  int value = analogRead(pin);
+
+  if (value > peak) {
+    peak = value;
+  }
+
+  if (value > threshold && !isHit) {
+    isHit = true;
+    peak = value;
+  }
+
+  if (isHit && value < threshold / 2) {
+    int velocity = map(peak, threshold, 900, 40, 127);
+    velocity = constrain(velocity, 40, 127);
+
+    noteOn(note, velocity);
+    delay(5);
+    noteOff(note);
+
+    isHit = false;
+    peak = 0;
+  }
+}
+
+void noteOn(byte pitch, byte velocity) {
+  midiEventPacket_t event = {0x09, 0x90, pitch, velocity};
+  MidiUSB.sendMIDI(event);
+  MidiUSB.flush();
+}
+
+void noteOff(byte pitch) {
+  midiEventPacket_t event = {0x08, 0x80, pitch, 0};
+  MidiUSB.sendMIDI(event);
+  MidiUSB.flush();
+}
+```
+
+I added a second sensor on port A1 and gave that the note of a standard snare so now i have a kick on piezo sensor 1 in port A0 and a snare on piezo sensor 2 in port A1. It works! Only there is still some malfunctioning in piezo sensor 1 (the kick), because the kick is still not clear and pure. There is still some messy cloudy sound.
+
+1. **wired-up three piezo element to my arduino board and try to make different sounds for the different piezo elements with MIDI thru Garageband when giving vibration to the piezo elements**
+
+***Coding part:***
+
+```
+#include "MIDIUSB.h"
+
+const int kickPin  = A0;
+const int snarePin = A1;
+const int cymbalPin = A2;
+
+const int threshold = 70;
+const int kickNote  = 36;   // C1
+const int snareNote = 38;   // D1
+const int cymbalNote = 49;  // Cymbal 
+
+int peakKick  = 0;
+int peakSnare = 0;
+int peakCymbal = 0;
+bool kickHit  = false;
+bool snareHit = false;
+bool cymbalHit = false;
+
+void setup() {
+}
+
+void loop() {
+  handlePiezo(kickPin,  kickNote,  peakKick,  kickHit);
+  handlePiezo(snarePin, snareNote, peakSnare, snareHit);
+  handlePiezo(cymbalPin, cymbalNote, peakCymbal, cymbalHit);
+  delay(2);
+}
+
+void handlePiezo(int pin, int note, int &peak, bool &isHit) {
+  int value = analogRead(pin);
+
+  if (value > peak) {
+    peak = value;
+  }
+
+  if (value > threshold && !isHit) {
+    isHit = true;
+    peak = value;
+  }
+
+  if (isHit && value < threshold / 2) {
+    int velocity = map(peak, threshold, 900, 40, 127);
+    velocity = constrain(velocity, 40, 127);
+
+    noteOn(note, velocity);
+    delay(5);
+    noteOff(note);
+
+    isHit = false;
+    peak = 0;
+  }
+}
+
+void noteOn(byte pitch, byte velocity) {
+  midiEventPacket_t event = {0x09, 0x90, pitch, velocity};
+  MidiUSB.sendMIDI(event);
+  MidiUSB.flush();
+}
+
+void noteOff(byte pitch) {
+  midiEventPacket_t event = {0x08, 0x80, pitch, 0};
+  MidiUSB.sendMIDI(event);
+  MidiUSB.flush();
+}
+```
+
+I added a third sensor on port A2 and gave that the note of a standard cymbal so now i have a kick on piezo sensor 1 in port A0 and a snare on piezo sensor 2 in port A1 and a cymbal on piezo sensor 3 in port A2. It works! Only there is still some malfunctioning in piezo sensor 1 (the kick), because the kick is still not clear and pure. There is still some messy cloudy sound.
+
+1. **wired-up three piezo element to my arduino board and try to make different sounds for the different piezo elements with MIDI thru Logic Pro when giving vibration to the piezo elements**
+
+***Coding part:***
+
+```
+#include "MIDIUSB.h"
+
+struct Piezo {
+  int pin;
+  int note;
+  int threshold;
+  int peak;
+  bool isHit;
+  unsigned long lastHitTime;
+  unsigned long noteOffTime;
+};
+
+const int numPiezos = 3;
+Piezo piezos[numPiezos] = {
+  {A0, 36, 60, 0, false, 0, 0}, // C1
+  {A1, 38, 60, 0, false, 0, 0},  // D1
+  {A2, 49, 60, 0, false, 0, 0},  // Cymbal
+};
+
+const unsigned long lockoutTime = 20;
+const unsigned long noteDuration = 30;
+const int minVelocity = 30;
+const int maxVelocity = 127;
+
+void setup() {
+  Serial.begin(115200);
+}
+
+void loop() {
+  unsigned long now = millis();
+
+  for (int i = 0; i < numPiezos; i++) {
+    handlePiezo(piezos[i], now);
+  }
+}
+
+void handlePiezo(Piezo &p, unsigned long now) {
+  int value = analogRead(p.pin);
+
+  if (value > p.peak) p.peak = value;
+
+  if (value > p.threshold && !p.isHit && now - p.lastHitTime > lockoutTime) {
+    p.isHit = true;
+    p.peak = value;
+  }
+
+  if (p.isHit && value < p.threshold / 2) {
+    int velocity = map(p.peak, p.threshold, 900, minVelocity, maxVelocity);
+    velocity = constrain(velocity, minVelocity, maxVelocity);
+
+    noteOn(p.note, velocity);
+    p.noteOffTime = now + noteDuration;
+
+    p.isHit = false;
+    p.peak = 0;
+    p.lastHitTime = now;
+  }
+
+  if (p.noteOffTime != 0 && now >= p.noteOffTime) {
+    noteOff(p.note);
+    p.noteOffTime = 0;
+  }
+}
+
+void noteOn(byte pitch, byte velocity) {
+  midiEventPacket_t event = {0x09, 0x99, pitch, velocity};
+  MidiUSB.sendMIDI(event);
+  MidiUSB.flush();
+}
+
+void noteOff(byte pitch) {
+  midiEventPacket_t event = {0x08, 0x89, pitch, 0};
+  MidiUSB.sendMIDI(event);
+  MidiUSB.flush();
+}
+
+```
+
+I added a third sensor on port A2 and gave that the note of a standard cymbal so now i have a kick on piezo sensor 1 in port A0 and a snare on piezo sensor 2 in port A1 and a cymbal on piezo sensor 3 in port A2. It works! Only sometimes there is some crossover sound, like when tapping the kick sensor sometimes there is also a snare sound with it. + Sometimes when i’m not tapping it happens that the sounds play one time each.
+
+# Fourth Testing Demo with Piezo Elements
+
+1. **wired-up all piezo element to my Arduino board and try to make different drum sounds for the different piezo elements with MIDI thru Logic Pro when giving vibration to the piezo elements**
+
+***Hardware Build-up:***
+
+‼️ I ordered two extra Analog Multiplexers because i have 11 piezo sensors and they need to be wired-up with analog ports, and i also have 11 potentiometers and they also need to be wired-up on analog ports, so Analog Multiplexers are the best option for this because they extend the analog inputs and they wired-up on your Arduino with one analog port and 5 digital ports and one GND and VCC. with two Analog Multiplexers I extend the analog ports from 4 to 32. I came to this solution using AI to solve the problem: https://chatgpt.com/c/696792c4-65dc-832b-abd2-81c3df29064e
+
+***Coding part:***
+
+1.1  ✅ wired-up 1 piezo element to my arduino board with an analog multiplexer and make drum sounds with MIDI thru Logic Pro when giving vibration to the piezo elements.
+
+***Coding part:*** 
+
+```
+#include "MIDIUSB.h"
+
+const int snarePin = A0;
+
+const int s0 = 4;
+const int s1 = 5;
+const int s2 = 6;
+const int s3 = 7;
+
+const int threshold = 70;
+const int snareNote = 34;
+
+int peakSnare = 0;
+bool snareHit = false;
+
+void setup() {
+  pinMode(s0, OUTPUT);
+  pinMode(s1, OUTPUT);
+  pinMode(s2, OUTPUT);
+  pinMode(s3, OUTPUT);
+}
+
+void loop() {
+  selectMuxChannel(15);
+  delayMicroseconds(5);
+
+  handlePiezo(snarePin, snareNote, peakSnare, snareHit);
+  delay(2);
+}
+
+void selectMuxChannel(byte channel) {
+  digitalWrite(s0, channel & 0x01);
+  digitalWrite(s1, (channel >> 1) & 0x01);
+  digitalWrite(s2, (channel >> 2) & 0x01);
+  digitalWrite(s3, (channel >> 3) & 0x01);
+}
+
+void handlePiezo(int pin, int note, int &peak, bool &isHit) {
+  int value = analogRead(pin);
+
+  if (value > peak) {
+    peak = value;
+  }
+
+  if (value > threshold && !isHit) {
+    isHit = true;
+    peak = value;
+  }
+
+  if (isHit && value < threshold / 2) {
+    int velocity = map(peak, threshold, 900, 40, 127);
+    velocity = constrain(velocity, 40, 127);
+
+    noteOn(note, velocity);
+    delay(5);
+    noteOff(note);
+
+    isHit = false;
+    peak = 0;
+  }
+}
+
+void noteOn(byte pitch, byte velocity) {
+  midiEventPacket_t event = {0x09, 0x90, pitch, velocity};
+  MidiUSB.sendMIDI(event);
+  MidiUSB.flush();
+}
+
+void noteOff(byte pitch) {
+  midiEventPacket_t event = {0x08, 0x80, pitch, 0};
+  MidiUSB.sendMIDI(event);
+  MidiUSB.flush();
+}
+```
+
+In code I added the 4 selected pins and made sure they are read as outputs in setup() and then select the Mux-channel C15 and add some delay. + add selectMuxChannel so the multiplexer knows that he has to listen to the input of C15
+
+1.2 ‼️ wired-up 2 piezo element to my Arduino board with an analog multiplexer and try to make drum sounds with MIDI thru Logic Pro when giving vibration to the piezo elements.
+
+***Coding part:*** 
+
+```
+#include "MIDIUSB.h"
+
+const int muxAnalogPin = A0;
+
+const int s0 = 4;
+const int s1 = 5;
+const int s2 = 6;
+const int s3 = 7;
+
+const byte snareChannel = 15;
+const byte kickChannel  = 14;
+
+const int snareNote = 34;
+const int kickNote  = 36;
+
+const int threshold = 70;
+
+int peakSnare = 0;
+int peakKick  = 0;
+
+bool snareHit = false;
+bool kickHit  = false;
+
+void setup() {
+  pinMode(s0, OUTPUT);
+  pinMode(s1, OUTPUT);
+  pinMode(s2, OUTPUT);
+  pinMode(s3, OUTPUT);
+}
+
+void loop() {
+  selectMuxChannel(snareChannel);
+  delayMicroseconds(5);
+  handlePiezo(muxAnalogPin, snareNote, peakSnare, snareHit);
+
+  selectMuxChannel(kickChannel);
+  delayMicroseconds(5);
+  handlePiezo(muxAnalogPin, kickNote, peakKick, kickHit);
+
+  delay(2);
+}
+
+void selectMuxChannel(byte channel) {
+  digitalWrite(s0, channel & 0x01);
+  digitalWrite(s1, (channel >> 1) & 0x01);
+  digitalWrite(s2, (channel >> 2) & 0x01);
+  digitalWrite(s3, (channel >> 3) & 0x01);
+}
+
+void handlePiezo(int pin, int note, int &peak, bool &isHit) {
+  int value = analogRead(pin);
+
+  if (value > peak) {
+    peak = value;
+  }
+
+  if (value > threshold && !isHit) {
+    isHit = true;
+    peak = value;
+  }
+
+  if (isHit && value < threshold / 2) {
+    int velocity = map(peak, threshold, 900, 40, 127);
+    velocity = constrain(velocity, 40, 127);
+
+    noteOn(note, velocity);
+    delay(5);
+    noteOff(note);
+
+    isHit = false;
+    peak = 0;
+  }
+}
+
+void noteOn(byte pitch, byte velocity) {
+  midiEventPacket_t event = {0x09, 0x90, pitch, velocity};
+  MidiUSB.sendMIDI(event);
+  MidiUSB.flush();
+}
+
+void noteOff(byte pitch) {
+  midiEventPacket_t event = {0x08, 0x80, pitch, 0};
+  MidiUSB.sendMIDI(event);
+  MidiUSB.flush();
+}
+```
+
+It works good, also the rythmic and fast playing is good, the only problem is that they both play the same sound/note
+
+1.3  ‼️ wired-up 2 piezo element to my Arduino board with an analog multiplexer and try to make ***different*** drum sounds with MIDI thru Logic Pro when giving vibration to the piezo elements. Used AI to solve the problem: https://claude.ai/chat/beab1e5a-f25b-4085-bbe8-c7cb04e814eb
+
+***Coding part:*** 
+
+```
+#include "MIDIUSB.h"
+
+const int muxAnalogPin = A0;
+const int s0 = 2, s1 = 3, s2 = 4, s3 = 5;
+const int threshold = 100;
+
+const byte NUM_DRUMS = 2;
+struct Drum {
+  byte channel;
+  byte note;
+  int peak;
+  bool isHit;
+};
+
+Drum drums[NUM_DRUMS] = {
+  {1,  34, 0, false},
+  {14, 36, 0, false}
+};
+
+void setup() {
+  pinMode(s0, OUTPUT);
+  pinMode(s1, OUTPUT);
+  pinMode(s2, OUTPUT);
+  pinMode(s3, OUTPUT);
+}
+
+void loop() {
+  for (int i = 0; i < NUM_DRUMS; i++) {
+    selectMuxChannel(drums[i].channel);
+    delayMicroseconds(50);
+    handlePiezo(muxAnalogPin, drums[i].note, drums[i].peak, drums[i].isHit);
+  }
+  delay(1);
+}
+
+void selectMuxChannel(byte channel) {
+  digitalWrite(s0, channel & 0x01);
+  digitalWrite(s1, (channel >> 1) & 0x01);
+  digitalWrite(s2, (channel >> 2) & 0x01);
+  digitalWrite(s3, (channel >> 3) & 0x01);
+}
+
+void handlePiezo(int pin, int note, int &peak, bool &isHit) {
+  int value = analogRead(pin);
+
+  if (value > peak) {
+    peak = value;
+  }
+
+  if (value > threshold && !isHit) {
+    isHit = true;
+    peak = value;
+  }
+
+  if (isHit && value < threshold / 2) {
+    int velocity = map(peak, threshold, 900, 40, 127);
+    velocity = constrain(velocity, 40, 127);
+
+    noteOn(note, velocity);
+    delay(5);
+    noteOff(note);
+
+    isHit = false;
+    peak = 0;
+  }
+}
+
+void noteOn(byte pitch, byte velocity) {
+  midiEventPacket_t event = {0x09, 0x90, pitch, velocity};
+  MidiUSB.sendMIDI(event);
+  MidiUSB.flush();
+}
+
+void noteOff(byte pitch) {
+  midiEventPacket_t event = {0x08, 0x80, pitch, 0};
+  MidiUSB.sendMIDI(event);
+  MidiUSB.flush();
+}
+```
+
+Now changed the code to this. I assign the channels and notes now in an array, easier to add more piezo’s. I also changed the S0, S… to it’s correct Digital port on my Arduino and increased the treshold and changed the delay. It’s still not good! but when you tap the snare Piezo you hear still both sounds but the snare sound is more dominant and when you tap the kick Piezo you hear also still both sounds but the kick sound is more dominant, so were getting somewhere.
+
+1.4  ✅ wired-up 2 piezo element to my Arduino board with an analog multiplexer and try to make ***different*** drum sounds with MIDI thru Logic Pro when giving vibration to the piezo elements. Asked for help on Arduino Forum: https://forum.arduino.cc/t/multiple-piezo-discs-thru-mux-to-make-e-drum/1426142
+
+***Coding part:*** 
+
+1.5  ✅ wired-up all the piezo elements to my Arduino board with an analog multiplexer and try to make drum sounds with MIDI thru Logic Pro when giving vibration to the piezo elements.
+
+***Coding part:*** 
+
+# Fifth Testing Demo with Piezo Elements
+
+1. **wired-up one piezo element to my Arduino board thru Mux and hang it on my drum kit and try to make different drum sounds for the piezo element with MIDI thru Logic Pro with potentiometer when giving vibration to the piezo element**
+
+***Coding part:*** 
+
+```
+#include "MIDIUSB.h"
+
+const int snarePin  = A0;
+
+const int threshold = 70;
+const int snareNote  = 34;
+
+int peakSnare  = 0;
+bool snareHit  = false;
+
+void setup() {
+}
+
+void loop() {
+  handlePiezo(snarePin, snareNote, peakSnare, snareHit);
+  delay(2);
+}
+
+void handlePiezo(int pin, int note, int &peak, bool &isHit) {
+  int value = analogRead(pin);
+
+  if (value > peak) {
+    peak = value;
+  }
+
+  if (value > threshold && !isHit) {
+    isHit = true;
+    peak = value;
+  }
+
+  if (isHit && value < threshold / 2) {
+    int velocity = map(peak, threshold, 900, 40, 127);
+    velocity = constrain(velocity, 40, 127);
+
+    noteOn(note, velocity);
+    delay(5);
+    noteOff(note);
+
+    isHit = false;
+    peak = 0;
+  }
+}
+
+void noteOn(byte pitch, byte velocity) {
+  midiEventPacket_t event = {0x09, 0x90, pitch, velocity};
+  MidiUSB.sendMIDI(event);
+  MidiUSB.flush();
+}
+
+void noteOff(byte pitch) {
+  midiEventPacket_t event = {0x08, 0x80, pitch, 0};
+  MidiUSB.sendMIDI(event);
+  MidiUSB.flush();
+}
+```
+
+The sound isn’t always correct with the hits on the drum, the sounds aren’t fast and clear and the rythm isn’t correct.
+
+1.1 ****Going to place the sensor on the center of the inside of the top batter head for better vibration/hits and no ringing, etc…
+
+***Coding part:*** 
+
+```
+#include "MIDIUSB.h"
+
+const int snarePin  = A0;
+
+const int threshold = 70;
+const int snareNote  = 34;
+
+int peakSnare  = 0;
+bool snareHit  = false;
+
+void setup() {
+}
+
+void loop() {
+  handlePiezo(snarePin, snareNote, peakSnare, snareHit);
+  delay(2);
+}
+
+void handlePiezo(int pin, int note, int &peak, bool &isHit) {
+  int value = analogRead(pin);
+
+  if (value > peak) {
+    peak = value;
+  }
+
+  if (value > threshold && !isHit) {
+    isHit = true;
+    peak = value;
+  }
+
+  if (isHit && value < threshold / 2) {
+    int velocity = map(peak, threshold, 900, 40, 127);
+    velocity = constrain(velocity, 40, 127);
+
+    noteOn(note, velocity);
+    delay(5);
+    noteOff(note);
+
+    isHit = false;
+    peak = 0;
+  }
+}
+
+void noteOn(byte pitch, byte velocity) {
+  midiEventPacket_t event = {0x09, 0x90, pitch, velocity};
+  MidiUSB.sendMIDI(event);
+  MidiUSB.flush();
+}
+
+void noteOff(byte pitch) {
+  midiEventPacket_t event = {0x08, 0x80, pitch, 0};
+  MidiUSB.sendMIDI(event);
+  MidiUSB.flush();
+}
+```
+
+The sound isn’t always correct with the hits on the drum, the sounds aren’t fast and clear and the rythm isn’t correct. it only detects when i hit the piezo not when i hit other places on the drum head, and even then it sometimes doesn’t detect
+
+1.2 ****Going to place the sensor on the outside of “the inside of the top batter head” for better vibration/hits and no ringing, etc…
+
+***Coding part:*** 
+
+```
+#include "MIDIUSB.h"
+
+const int snarePin  = A0;
+const int snareNote = 34;
+
+const int threshold = 2;
+const int retriggerTime = 18;
+
+unsigned long lastTriggerTime = 0;
+unsigned long peakStartTime = 0;
+
+int peak = 0;
+bool measuringPeak = false;
+
+void setup() {
+}
+
+void loop() {
+  handlePiezoAcoustic(snarePin, snareNote);
+}
+
+void handlePiezoAcoustic(int pin, int note) {
+  int value = analogRead(pin);
+  unsigned long now = millis();
+
+  if (!measuringPeak &&
+      value > threshold &&
+      (now - lastTriggerTime) > retriggerTime) {
+
+    measuringPeak = true;
+    peak = value;
+    peakStartTime = now;
+  }
+
+  if (measuringPeak) {
+    if (value > peak) peak = value;
+
+    if (now - peakStartTime >= 2) {
+
+      int velocity = map(peak, threshold, 500, 15, 127);
+      velocity = constrain(velocity, 15, 127);
+
+      noteOn(note, velocity);
+      noteOff(note);
+
+      lastTriggerTime = now;
+      measuringPeak = false;
+      peak = 0;
+    }
+  }
+}
+
+void noteOn(byte pitch, byte velocity) {
+  midiEventPacket_t event = {0x09, 0x90, pitch, velocity};
+  MidiUSB.sendMIDI(event);
+  MidiUSB.flush();
+}
+
+void noteOff(byte pitch) {
+  midiEventPacket_t event = {0x08, 0x80, pitch, 0};
+  MidiUSB.sendMIDI(event);
+  MidiUSB.flush();
+}
+
+```
+
+The sound isn’t always correct with the hits on the drum, but it detects the vibrations and the sounds are also good, it’s more working now because i changed the treshold to lower, deleted the delay and added a retriggerTime because i play on acoustic drum heads. now it’s more accurate and more rythmic with the hits
+
+1. **wired-up all piezo element thru Mux to my Arduino board and hang it on my drum kit and try to make different drum sounds for the piezo element with MIDI thru Logic Pro when giving vibration to the piezo element**
+
+***Coding part:***
