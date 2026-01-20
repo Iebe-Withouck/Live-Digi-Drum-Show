@@ -1,0 +1,1 @@
+In this branch you will find the end result Arduino code for the full working project with 11 piezo sensors and 11 potentiometers knobs and 2 potentiometer sliders.
