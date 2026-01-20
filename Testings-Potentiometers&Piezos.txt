@@ -1,0 +1,336 @@
+# First Testing Demo with Potentiometers
+
+1. **wired-up one potentiometer to one piezo element to my arduino board and try to change the sounds when turning the potentiometer from the piezo vibrations, following the Arduino documentation for potentiometers:** https://docs.arduino.cc/learn/electronics/potentiometer-basics/
+
+***Coding part:*** 
+
+```
+#include "MIDIUSB.h"
+
+struct Piezo {
+  int pin;
+  int threshold;
+  int peak;
+  bool isHit;
+  unsigned long lastHitTime;
+  unsigned long noteOffTime;
+};
+
+Piezo piezo = {A0, 15, 0, false, 0, 0};
+
+const int potPin = A3;
+
+const int numSounds = 16;
+const byte soundNotes[numSounds] = {
+  36,  // C2
+  32,  // G#1
+  28,  // E1
+  24,  // C1
+  25,  // C#2
+  33,  // A1
+  29,  // F1
+  39,  // D#2
+  38,  // D2
+  34,  // A#1
+  30,  // F#1
+  26,  // D1
+  27,  // D#1
+  54,  // F#3
+  47,  // B1
+  31   // G1
+};
+
+const unsigned long lockoutTime = 25;
+const unsigned long noteDuration = 30;
+const int minVelocity = 50;
+const int maxVelocity = 127;
+
+int lastZone = -1;
+
+void setup() {
+  Serial.begin(115200);
+}
+
+void loop() {
+  unsigned long now = millis();
+
+  int potValue = analogRead(potPin);
+
+  int currentZone = map(potValue, 0, 1015, 0, numSounds - 1);
+  currentZone = constrain(currentZone, 0, numSounds - 1);
+
+  Serial.print("Pot value: ");
+  Serial.print(potValue);
+  Serial.print("  |  Selected MIDI note: ");
+  Serial.println(soundNotes[currentZone]);
+
+  handlePiezo(piezo, now, soundNotes[currentZone]);
+
+  delay(20);
+}
+
+void handlePiezo(Piezo &p, unsigned long now, byte midiNote) {
+  int value = analogRead(p.pin);
+
+  if (value > p.peak) p.peak = value;
+
+  if (value > p.threshold && !p.isHit && now - p.lastHitTime > lockoutTime) {
+    p.isHit = true;
+    p.peak = value;
+  }
+
+  if (p.isHit && value < p.threshold / 2) {
+    int velocity = map(p.peak, p.threshold, 900, minVelocity, maxVelocity);
+    velocity = constrain(velocity, minVelocity, maxVelocity);
+
+    noteOn(midiNote, velocity);
+    p.noteOffTime = now + noteDuration;
+
+    p.isHit = false;
+    p.peak = 0;
+    p.lastHitTime = now;
+  }
+
+  if (p.noteOffTime != 0 && now >= p.noteOffTime) {
+    noteOff(midiNote);
+    p.noteOffTime = 0;
+  }
+}
+
+void noteOn(byte pitch, byte velocity) {
+  midiEventPacket_t event = {0x09, 0x99, pitch, velocity};
+  MidiUSB.sendMIDI(event);
+  MidiUSB.flush();
+}
+
+void noteOff(byte pitch) {
+  midiEventPacket_t event = {0x08, 0x89, pitch, 0};
+  MidiUSB.sendMIDI(event);
+  MidiUSB.flush();
+}
+```
+
+I assigned different pot values to different notes so when i change the potentiometers value, there is a different value sent to Arduino IDE, in Arduino IDE there are different notes assigned to different values, and than Arduino IDE sends that MIDI note to Logic Pro. I have still some bugs because i assigned 16 pads and in serial monitor in Arduino IDE we get the different values and the different 16 notes assigned to those values in, but when turning the knob we only can hear 4 notes in their value range, all the other values ranges are empty and we hear nothing, we only can hear the notes: C1, B1, D1 and D#1
+
+1.1 ✅ Trying to assign at least 10 different sounds to the potentiometer and make sure I can hear them all, because previous I could only hear 4 different notes
+
+***Coding part:*** 
+
+```
+#include "MIDIUSB.h"
+
+struct Piezo {
+  int pin;
+  int threshold;
+  int peak;
+  bool isHit;
+  unsigned long lastHitTime;
+  unsigned long noteOffTime;
+};
+
+Piezo piezo1 = {A0, 15, 0, false, 0, 0};
+
+const int pot1 = A3;
+
+const byte track1Notes[16] = {
+  59, 60, 61, 62, 63, 64, 65, 66,
+  67, 68, 69, 70, 71, 72, 73, 74
+};
+
+const int minVelocity = 50;
+const int maxVelocity = 127;
+const unsigned long lockoutTime = 25;
+const unsigned long noteDuration = 30;
+
+void setup() {
+}
+
+void loop() {
+  unsigned long now = millis();
+
+  int pot1Value = analogRead(pot1);
+
+  int zone1 = pot1Value / 64;
+  zone1 = constrain(zone1, 0, 15);
+
+  handlePiezo(piezo1, now, track1Notes[zone1], 10);
+
+  delay(20);
+}
+
+void handlePiezo(Piezo &p, unsigned long now, byte midiNote, byte channel) {
+  int value = analogRead(p.pin);
+  if (value > p.peak) p.peak = value;
+
+  if (value > p.threshold && !p.isHit && now - p.lastHitTime > lockoutTime) {
+    p.isHit = true;
+    p.peak = value;
+  }
+
+  if (p.isHit && value < p.threshold / 2) {
+    int velocity = map(p.peak, p.threshold, 900, minVelocity, maxVelocity);
+    velocity = constrain(velocity, minVelocity, maxVelocity);
+
+    noteOn(midiNote, velocity, channel);
+    p.noteOffTime = now + noteDuration;
+
+    p.isHit = false;
+    p.peak = 0;
+    p.lastHitTime = now;
+  }
+
+  if (p.noteOffTime != 0 && now >= p.noteOffTime) {
+    noteOff(midiNote, channel);
+    p.noteOffTime = 0;
+  }
+}
+
+void noteOn(byte pitch, byte velocity, byte channel) {
+  midiEventPacket_t event = {0x09, 0x90 + (channel-1), pitch, velocity};
+  MidiUSB.sendMIDI(event);
+  MidiUSB.flush();
+}
+
+void noteOff(byte pitch, byte channel) {
+  midiEventPacket_t event = {0x08, 0x80 + (channel-1), pitch, 0};
+  MidiUSB.sendMIDI(event);
+  MidiUSB.flush();
+}
+
+```
+
+Now all the 16 different samples can be selected with the potentiometer and can be heard. 
+
+# Second Testing Demo with Potentiometers
+
+1. **wired-up multiple potentiometer to multiple piezo element to my Arduino board and try to change the different sounds when turning the potentiometers from the different piezo vibrations**
+
+***Coding part:*** 
+
+```
+#include "MIDIUSB.h"
+
+struct Piezo {
+  int pin;
+  int threshold;
+  int peak;
+  bool isHit;
+  unsigned long lastHitTime;
+  unsigned long noteOffTime;
+};
+
+Piezo piezo1 = {A0, 15, 0, false, 0, 0};
+Piezo piezo2 = {A1, 15, 0, false, 0, 0};
+
+const int pot1 = A3;
+const int pot2 = A2;
+
+const byte track1Notes[16] = {
+  59, 60, 61, 62, 63, 64, 65, 66,
+  67, 68, 69, 70, 71, 72, 73, 74
+};
+
+const byte track2Notes[16] = {
+  2, 3, 4, 5, 6, 7, 8, 9,
+  10, 11, 12, 13, 14, 15, 16, 17
+};
+
+const char* track1NoteNames[16] = {
+  "B2","C3","C#3","D3","D#3","E3","F3","F#3",
+  "G3","G#3","A3","A#3","B3","C4","C#4","D4"
+};
+
+const char* track2NoteNames[16] = {
+  "C2","G1","E1","C1","C#2","F#2","D#2","G2",
+  "F#3","C3","G3","D3","F3","A3","C4","D#4"
+};
+
+const int minVelocity = 50;
+const int maxVelocity = 127;
+const unsigned long lockoutTime = 25;
+const unsigned long noteDuration = 30;
+
+void setup() {
+  Serial.begin(115200);
+}
+
+void loop() {
+  unsigned long now = millis();
+
+  int pot1Value = analogRead(pot1);
+  int pot2Value = analogRead(pot2);
+
+  int zone1 = pot1Value / 64;
+  zone1 = constrain(zone1, 0, 15);
+  handlePiezo(piezo1, now, track1Notes[zone1], 10);
+
+  int zone2 = pot2Value / 64;
+  zone2 = constrain(zone2, 0, 15);
+  handlePiezo(piezo2, now, track2Notes[zone2], 11);
+
+  delay(20);
+}
+
+void handlePiezo(Piezo &p, unsigned long now, byte midiNote, byte channel) {
+  int value = analogRead(p.pin);
+  if (value > p.peak) p.peak = value;
+
+  if (value > p.threshold && !p.isHit && now - p.lastHitTime > lockoutTime) {
+    p.isHit = true;
+    p.peak = value;
+  }
+
+  if (p.isHit && value < p.threshold / 2) {
+    int velocity = map(p.peak, p.threshold, 900, minVelocity, maxVelocity);
+    velocity = constrain(velocity, minVelocity, maxVelocity);
+
+    noteOn(midiNote, velocity, channel);
+    p.noteOffTime = now + noteDuration;
+
+    p.isHit = false;
+    p.peak = 0;
+    p.lastHitTime = now;
+  }
+
+  if (p.noteOffTime != 0 && now >= p.noteOffTime) {
+    noteOff(midiNote, channel);
+    p.noteOffTime = 0;
+  }
+}
+
+void noteOn(byte pitch, byte velocity, byte channel) {
+  midiEventPacket_t event = {0x09, 0x90 + (channel-1), pitch, velocity};
+  MidiUSB.sendMIDI(event);
+  MidiUSB.flush();
+}
+
+void noteOff(byte pitch, byte channel) {
+  midiEventPacket_t event = {0x08, 0x80 + (channel-1), pitch, 0};
+  MidiUSB.sendMIDI(event);
+  MidiUSB.flush();
+}
+```
+
+I assigned different pot values to different notes so when i change the potentiometers value, there is a different value sent to Arduino IDE, in Arduino IDE there are different notes assigned to different values, and than Arduino IDE sends that MIDI note to Logic Pro. I wire-up a second piezo sensor and a second potentiometer and I made a kick kit for them with all kick samples, they can both play at the same time and both the piezo’s and potentiometers work separately and good.
+
+# Third Testing Demo with Piezo Elements
+
+1. **wired-up 1 piezo element thru Mux with it’s own potentiometer thru a second Mux to my Arduino board and try to make different drum sounds for the different piezo elements with MIDI thru Logic Pro when giving vibration to the piezo elements**
+
+***Coding part:***
+
+1. **wired-up 2 piezo element thru Mux with each it’s own potentiometer thru a second Mux to my Arduino board and try to make different drum sounds for the different piezo elements with MIDI thru Logic Pro when giving vibration to the piezo elements**
+
+***Coding part:***
+
+# Fourth Testing Demo with Piezo Elements
+
+1. **wired-up all piezo element thru Mux with each it’s own potentiometer thru a second Mux to my Arduino board and try to make different drum sounds for the different piezo elements with MIDI thru Logic Pro when giving vibration to the piezo elements**
+
+***Coding part:***
+
+# Fifth Testing Demo with Piezo Elements
+
+1. **wired-up all piezo element thru Mux with each it’s own potentiometer thru a second Mux to my Arduino board and hang them on my drum kit and try to make different drum sounds for the different piezo elements with MIDI thru Logic Pro when giving vibration to the piezo elements**
+
+***Coding part:***
