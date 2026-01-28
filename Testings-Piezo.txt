@@ -228,6 +228,7 @@ void loop() {
 
 I updated the code so that each piezo sensor flikkers it’s own LED when getting a knock/tap. I also made the treshold higher because the sensors were still to sensitive and were capturing more vibrations etc… then a knock. There are still some bugs because sometimes de LED’s flikker when the sensors are not getting tapped and sometimes they flikker multiple times after each other
 
+
 # Second Testing Demo with Piezo Elements
 
 1. **wired-up one piezo element to my arduino board and try to make sure when tapping the sensor there is a sound produced/created that plays from my computer. I followed this tutorial:** https://www.youtube.com/watch?v=LZp2r3RUEj4&t=7s **+ the help of AI:** https://chatgpt.com/c/695e2f99-0704-8330-b724-f4e2fabb80fc
@@ -290,6 +291,7 @@ void noteOff(byte pitch) {
 ```
 
 I searched for an alternative on the web for loopMidi because loopMidi is for windows, mac has already a build in Audio MIDI setup so that’s handy. Now the program were i send the MIDI signals to isn’t Ableton because it’s not free, but Garageband is already on iOS and is easy to use on Macbook. now in Audio MIDI I setup my Arduino MIDI signals and then in Garageband i make sure that those MIDI signals come in and are linked to a drumkit and in my Arduino code I set the note to 36 because that’s the note for a standard drum kick. Inside Arduino I installed MIDIUSB because with Arduino Micro you can use this build-in and that makes sure that my mac sees the Arduino as an midi controller. The only thing is that the sound/note that is produced when i tap the sensor is still not clear and pure, so i still have to make some changes to make sure i have pure and clear sounds per sensor and not rumbling sounds thru each other.
+
 
 # Third Testing Demo with Piezo Elements
 
@@ -521,17 +523,16 @@ void noteOff(byte pitch) {
 
 I added a third sensor on port A2 and gave that the note of a standard cymbal so now i have a kick on piezo sensor 1 in port A0 and a snare on piezo sensor 2 in port A1 and a cymbal on piezo sensor 3 in port A2. It works! Only sometimes there is some crossover sound, like when tapping the kick sensor sometimes there is also a snare sound with it. + Sometimes when i’m not tapping it happens that the sounds play one time each.
 
+
 # Fourth Testing Demo with Piezo Elements
 
 1. **wired-up all piezo element to my Arduino board and try to make different drum sounds for the different piezo elements with MIDI thru Logic Pro when giving vibration to the piezo elements**
 
-***Hardware Build-up:***
-
 ‼️ I ordered two extra Analog Multiplexers because i have 11 piezo sensors and they need to be wired-up with analog ports, and i also have 11 potentiometers and they also need to be wired-up on analog ports, so Analog Multiplexers are the best option for this because they extend the analog inputs and they wired-up on your Arduino with one analog port and 5 digital ports and one GND and VCC. with two Analog Multiplexers I extend the analog ports from 4 to 32. I came to this solution using AI to solve the problem: https://chatgpt.com/c/696792c4-65dc-832b-abd2-81c3df29064e
 
-***Coding part:***
+1.1  ✅ wired-up 1 piezo element to my Arduino board with an analog multiplexer and make drum sounds with MIDI thru Logic Pro when giving vibration to the piezo elements.
 
-1.1  ✅ wired-up 1 piezo element to my arduino board with an analog multiplexer and make drum sounds with MIDI thru Logic Pro when giving vibration to the piezo elements.
+I wire-up an Analog Multiplexer to my Arduino Pro Micro. I did this by connecting the VCC from the Mux to the VCC of my Arduino and the same for the GND, then connected S0, S1, S2, S3 of the Mux to 2, 3, 4, 5 on my Arduino and at last I connected the SIG on the Mux to A0 on my Arduino Now i have 16 analog ports and it works, somehow even better than before, the piezo gives more rythmic thru. 
 
 ***Coding part:*** 
 
@@ -794,17 +795,355 @@ void noteOff(byte pitch) {
 
 Now changed the code to this. I assign the channels and notes now in an array, easier to add more piezo’s. I also changed the S0, S… to it’s correct Digital port on my Arduino and increased the treshold and changed the delay. It’s still not good! but when you tap the snare Piezo you hear still both sounds but the snare sound is more dominant and when you tap the kick Piezo you hear also still both sounds but the kick sound is more dominant, so were getting somewhere.
 
-1.4  ✅ wired-up 2 piezo element to my Arduino board with an analog multiplexer and try to make ***different*** drum sounds with MIDI thru Logic Pro when giving vibration to the piezo elements. Asked for help on Arduino Forum: https://forum.arduino.cc/t/multiple-piezo-discs-thru-mux-to-make-e-drum/1426142
+1.4  ‼️ wired-up 2 piezo element to my Arduino board with an analog multiplexer and try to make ***different*** drum sounds with MIDI thru Logic Pro when giving vibration to the piezo elements. Asked for help on Arduino Forum: https://forum.arduino.cc/t/multiple-piezo-discs-thru-mux-to-make-e-drum/1426142 and used AI: https://claude.ai/chat/134e2916-be4b-4d2e-b3de-4d8e8aa1e3a5
+
+***Hardware Build-up:***
+
+Easy to wire-up, just received tips in the forum that this is not the best way to wire-up my mux, because it is possible the electronics doesn't transmit properly, because I just pinned the wire in the hole. Also they refer to cross-talk what’s common with multiplexers, they suggest to use OpAmp’s which reduces high-frequency from analog inputs and to solder my header pins onto my Mux. I don’t have OpAmp’s so i soldered the header pins.
 
 ***Coding part:*** 
 
-1.5  ✅ wired-up all the piezo elements to my Arduino board with an analog multiplexer and try to make drum sounds with MIDI thru Logic Pro when giving vibration to the piezo elements.
+```
+#include "MIDIUSB.h"
+
+const int muxAnalogPin = A0;
+const int s0 = 2, s1 = 3, s2 = 4, s3 = 5;
+
+const byte NUM_DRUMS = 2;
+struct Drum {
+  byte channel;
+  byte note;
+  int threshold;
+  int peak;
+  bool isHit;
+  unsigned long lastHitTime;
+  unsigned long minTimeBetweenHits;
+  int lastPeakValue;
+};
+
+Drum drums[NUM_DRUMS] = {
+  {1,  34, 250, 0, false, 0, 50, 0},
+  {14, 36, 250, 0, false, 0, 50, 0}
+};
+
+const unsigned long CROSS_TALK_WINDOW = 35;
+const float CROSS_TALK_RATIO = 0.3;
+
+void setup() {
+  pinMode(s0, OUTPUT);
+  pinMode(s1, OUTPUT);
+  pinMode(s2, OUTPUT);
+  pinMode(s3, OUTPUT);
+  Serial.begin(9600);
+}
+
+void loop() {
+  for (int i = 0; i < NUM_DRUMS; i++) {
+    selectMuxChannel(drums[i].channel);
+    delayMicroseconds(800);
+    handlePiezo(muxAnalogPin, drums[i], i);
+  }
+  delay(2);
+}
+
+void selectMuxChannel(byte channel) {
+  digitalWrite(s0, channel & 0x01);
+  digitalWrite(s1, (channel >> 1) & 0x01);
+  digitalWrite(s2, (channel >> 2) & 0x01);
+  digitalWrite(s3, (channel >> 3) & 0x01);
+}
+
+void handlePiezo(int pin, Drum &drum, int drumIndex) {
+  int value = analogRead(pin);
+  unsigned long currentTime = millis();
+
+  if (value > drum.peak) {
+    drum.peak = value;
+  }
+
+  if (value > drum.threshold && !drum.isHit) {
+    if (currentTime - drum.lastHitTime >= drum.minTimeBetweenHits) {
+      bool allowHit = true;
+      
+      for (int i = 0; i < NUM_DRUMS; i++) {
+        if (i != drumIndex) {
+          unsigned long timeSinceOtherHit = currentTime - drums[i].lastHitTime;
+          
+          if (timeSinceOtherHit < CROSS_TALK_WINDOW) {
+            if (value < drums[i].lastPeakValue * CROSS_TALK_RATIO) {
+              allowHit = false;
+              break;
+            }
+          }
+        }
+      }
+      
+      if (allowHit) {
+        drum.isHit = true;
+        drum.peak = value;
+      }
+    }
+  }
+
+  if (drum.isHit && value < drum.threshold / 2) {
+    int velocity = map(drum.peak, drum.threshold, 900, 40, 127);
+    velocity = constrain(velocity, 40, 127);
+
+    noteOn(drum.note, velocity);
+    delay(5);
+    noteOff(drum.note);
+
+    drum.isHit = false;
+    drum.lastPeakValue = drum.peak;
+    drum.lastHitTime = currentTime;
+    drum.peak = 0;
+  }
+}
+
+void noteOn(byte pitch, byte velocity) {
+  midiEventPacket_t event = {0x09, 0x90, pitch, velocity};
+  MidiUSB.sendMIDI(event);
+  MidiUSB.flush();
+}
+
+void noteOff(byte pitch) {
+  midiEventPacket_t event = {0x08, 0x80, pitch, 0};
+  MidiUSB.sendMIDI(event);
+  MidiUSB.flush();
+}
+```
+
+I added cross-talk listeners to the code and make sure that it denies hits weaker then 40% of the recent hit so that it’s always the dominant hit that is hearable. When tapping the piezo sensors real hard, there is still some cross-talk.
+
+1.4  ✅ wired-up 2 piezo element to my Arduino board with an analog multiplexer and try to make ***different*** drum sounds without cross-talk with MIDI thru Logic Pro when giving vibration to the piezo elements. 
+
+***Hardware Build-up:***
+
+Now in the forum everybody suggest that i place the resistors in parallel with the piezo’s so i did, also i took 1Mohm resistors because they are common for piezo’s and not 47 ohm resistors, but there is still cross-talk. Now in the forum someone also said reducing the resistors to 100k ohm will reduce the sensitivity and cross-talk, now i used 100k resistors and the cross-talk is way less, almost none existing.
 
 ***Coding part:*** 
+
+```
+#include "MIDIUSB.h"
+
+const int muxAnalogPin = A0;
+const int s0 = 2, s1 = 3, s2 = 4, s3 = 5;
+
+const byte NUM_DRUMS = 2;
+
+struct Drum {
+  byte channel;
+  byte note;
+  int threshold;
+  int peak;
+  bool isHit;
+  unsigned long lastHitTime;
+  unsigned long minTimeBetweenHits;
+};
+
+Drum drums[NUM_DRUMS] = {
+  {1,  34, 90, 0, false, 0, 70},
+  {14, 36, 120, 0, false, 0, 90}
+};
+
+const unsigned long HIT_WINDOW = 30;
+const unsigned long LOCKOUT_TIME = 50;
+
+void setup() {
+  pinMode(s0, OUTPUT);
+  pinMode(s1, OUTPUT);
+  pinMode(s2, OUTPUT);
+  pinMode(s3, OUTPUT);
+}
+
+void loop() {
+  int maxValue = 0;
+  int maxIndex = -1;
+  unsigned long now = millis();
+
+  for (int i = 0; i < NUM_DRUMS; i++) {
+    selectMuxChannel(drums[i].channel);
+    delayMicroseconds(1000);
+
+    int value = analogRead(muxAnalogPin);
+
+    if (value > drums[i].peak) {
+      drums[i].peak = value;
+    }
+
+    if (value > drums[i].threshold &&
+        (now - drums[i].lastHitTime) > drums[i].minTimeBetweenHits) {
+
+      if (value > maxValue) {
+        maxValue = value;
+        maxIndex = i;
+      }
+    }
+  }
+
+  if (maxIndex != -1) {
+    Drum &d = drums[maxIndex];
+
+    int velocity = map(d.peak, d.threshold, 900, 40, 127);
+    velocity = constrain(velocity, 40, 127);
+
+    noteOn(d.note, velocity);
+    delay(5);
+    noteOff(d.note);
+
+    d.lastHitTime = now;
+  }
+
+  for (int i = 0; i < NUM_DRUMS; i++) {
+    if (now - drums[i].lastHitTime > HIT_WINDOW) {
+      drums[i].peak = 0;
+    }
+  }
+
+  delay(1);
+}
+
+void selectMuxChannel(byte channel) {
+  digitalWrite(s0, channel & 0x01);
+  digitalWrite(s1, (channel >> 1) & 0x01);
+  digitalWrite(s2, (channel >> 2) & 0x01);
+  digitalWrite(s3, (channel >> 3) & 0x01);
+}
+
+void noteOn(byte pitch, byte velocity) {
+  midiEventPacket_t event = {0x09, 0x90, pitch, velocity};
+  MidiUSB.sendMIDI(event);
+  MidiUSB.flush();
+}
+
+void noteOff(byte pitch) {
+  midiEventPacket_t event = {0x08, 0x80, pitch, 0};
+  MidiUSB.sendMIDI(event);
+  MidiUSB.flush();
+}
+```
+
+When tapping the piezo sensors real hard, there is still tiny/minor cross-talk. When tapping the piezo sensors soft/normal there is no cross-talk.
+
+1.6  ‼️ wired-up all the piezo elements to my Arduino board with an analog multiplexer and try to make drum sounds with MIDI thru Logic Pro when giving vibration to the piezo elements.
+
+***Coding part:*** 
+
+```
+#include "MIDIUSB.h"
+
+const int muxAnalogPin = A0;
+const int s0 = 2, s1 = 3, s2 = 4, s3 = 5;
+
+const byte NUM_DRUMS = 11;
+
+struct Drum {
+  byte channel;
+  byte note;
+  int threshold;
+  int peak;
+  bool isHit;
+  unsigned long lastHitTime;
+  unsigned long minTimeBetweenHits;
+};
+
+Drum drums[NUM_DRUMS] = {
+  {1,  34, 90,  0, false, 0, 70},  // Snare
+  {2,  42, 80,  0, false, 0, 40},  // Hi-hat
+  {3,  50, 90,  0, false, 0, 70},  // High Tom
+  {4,  36, 120, 0, false, 0, 90},  // Kick
+  {5,  49, 100, 0, false, 0, 120}, // Crash 1
+  {6,  55, 95,  0, false, 0, 120}, // Splash (kit in logic pro heeft geen splash)
+  {7,  57, 100, 0, false, 0, 120}, // Crash 2
+  {8,  43, 90,  0, false, 0, 80},  // Floor Tom 1
+  {9,  51, 95,  0, false, 0, 100}, // Ride
+  {10,  41, 90,  0, false, 0, 80}, // Floor Tom 2 (kit in logic pro heeft geen floor tom 2)
+  {11, 52, 100, 0, false, 0, 120}  // China (kit in logic pro heeft geen china)
+};
+
+const unsigned long HIT_WINDOW = 30;
+const unsigned long LOCKOUT_TIME = 50;
+
+void setup() {
+  pinMode(s0, OUTPUT);
+  pinMode(s1, OUTPUT);
+  pinMode(s2, OUTPUT);
+  pinMode(s3, OUTPUT);
+}
+
+void loop() {
+  int maxValue = 0;
+  int maxIndex = -1;
+  unsigned long now = millis();
+
+  for (int i = 0; i < NUM_DRUMS; i++) {
+    selectMuxChannel(drums[i].channel);
+    delayMicroseconds(1000);
+
+    int value = analogRead(muxAnalogPin);
+
+    if (value > drums[i].peak) {
+      drums[i].peak = value;
+    }
+
+    if (value > drums[i].threshold &&
+        (now - drums[i].lastHitTime) > drums[i].minTimeBetweenHits) {
+
+      if (value > maxValue) {
+        maxValue = value;
+        maxIndex = i;
+      }
+    }
+  }
+
+  if (maxIndex != -1) {
+    Drum &d = drums[maxIndex];
+
+    int velocity = map(d.peak, d.threshold, 900, 40, 127);
+    velocity = constrain(velocity, 40, 127);
+
+    noteOn(d.note, velocity);
+    delay(5);
+    noteOff(d.note);
+
+    d.lastHitTime = now;
+  }
+
+  for (int i = 0; i < NUM_DRUMS; i++) {
+    if (now - drums[i].lastHitTime > HIT_WINDOW) {
+      drums[i].peak = 0;
+    }
+  }
+
+  delay(1);
+}
+
+void selectMuxChannel(byte channel) {
+  digitalWrite(s0, channel & 0x01);
+  digitalWrite(s1, (channel >> 1) & 0x01);
+  digitalWrite(s2, (channel >> 2) & 0x01);
+  digitalWrite(s3, (channel >> 3) & 0x01);
+}
+
+void noteOn(byte pitch, byte velocity) {
+  midiEventPacket_t event = {0x09, 0x90, pitch, velocity};
+  MidiUSB.sendMIDI(event);
+  MidiUSB.flush();
+}
+
+void noteOff(byte pitch) {
+  midiEventPacket_t event = {0x08, 0x80, pitch, 0};
+  MidiUSB.sendMIDI(event);
+  MidiUSB.flush();
+}
+```
+
+The Splash, Floor tom 2 and China doesn’t work because the drumkit provided in Logic Pro only has Kick, High tom, Floor tom, Snare, Hihat, Ride, Crash 1 and Crash 2. There is also still some slightly cross-talk when tapping the piezo sensors hard which we didn’t had with 2 piezo’s wired up, but now we have 11 piezo’s wired-up.
+
 
 # Fifth Testing Demo with Piezo Elements
 
-1. **wired-up one piezo element to my Arduino board thru Mux and hang it on my drum kit and try to make different drum sounds for the piezo element with MIDI thru Logic Pro with potentiometer when giving vibration to the piezo element**
+1. ‼️ **wired-up one piezo element to my Arduino board thru Mux and hang it on my drum kit and try to make different drum sounds for the piezo element with MIDI thru Logic Pro with potentiometer when giving vibration to the piezo element**
 
 ***Coding part:*** 
 
@@ -867,7 +1206,7 @@ void noteOff(byte pitch) {
 
 The sound isn’t always correct with the hits on the drum, the sounds aren’t fast and clear and the rythm isn’t correct.
 
-1.1 ****Going to place the sensor on the center of the inside of the top batter head for better vibration/hits and no ringing, etc…
+1.1 ****‼️ Going to place the sensor on the center of the inside of the top batter head for better vibration/hits and no ringing, etc…
 
 ***Coding part:*** 
 
@@ -930,7 +1269,7 @@ void noteOff(byte pitch) {
 
 The sound isn’t always correct with the hits on the drum, the sounds aren’t fast and clear and the rythm isn’t correct. it only detects when i hit the piezo not when i hit other places on the drum head, and even then it sometimes doesn’t detect
 
-1.2 ****Going to place the sensor on the outside of “the inside of the top batter head” for better vibration/hits and no ringing, etc…
+1.2 ****‼️ Going to place the sensor on the outside of “the inside of the top batter head” for better vibration/hits and no ringing, etc…
 
 ***Coding part:*** 
 
@@ -1002,6 +1341,353 @@ void noteOff(byte pitch) {
 ```
 
 The sound isn’t always correct with the hits on the drum, but it detects the vibrations and the sounds are also good, it’s more working now because i changed the treshold to lower, deleted the delay and added a retriggerTime because i play on acoustic drum heads. now it’s more accurate and more rythmic with the hits
+
+1. ‼️ **wired-up all piezo elements to my Arduino board thru Mux and hang one on my drum kit and try to make different drum sounds for the piezo element with MIDI thru Logic Pro with potentiometer when giving vibration to the piezo element**
+
+***Coding part:*** 
+
+```
+#include "MIDIUSB.h"
+
+const int muxAnalogPin = A0;
+const int s0 = 2, s1 = 3, s2 = 4, s3 = 5;
+
+const byte NUM_DRUMS = 11;
+
+struct Drum {
+  byte channel;
+  byte note;
+  int threshold;
+  int peak;
+  bool isHit;
+  unsigned long lastHitTime;
+  unsigned long minTimeBetweenHits;
+};
+
+Drum drums[NUM_DRUMS] = {
+  {1,  34, 90,  0, false, 0, 70},  // Snare
+  {2,  42, 80,  0, false, 0, 40},  // Hi-hat
+  {3,  50, 90,  0, false, 0, 70},  // High Tom
+  {4,  36, 120, 0, false, 0, 90},  // Kick
+  {5,  49, 100, 0, false, 0, 120}, // Crash 1
+  {6,  55, 95,  0, false, 0, 120}, // Splash (kit in logic pro heeft geen splash)
+  {7,  57, 100, 0, false, 0, 120}, // Crash 2
+  {8,  43, 90,  0, false, 0, 80},  // Floor Tom 1
+  {9,  51, 95,  0, false, 0, 100}, // Ride
+  {10,  41, 90,  0, false, 0, 80}, // Floor Tom 2 (kit in logic pro heeft geen floor tom 2)
+  {11, 52, 100, 0, false, 0, 120}  // China (kit in logic pro heeft geen china)
+};
+
+const unsigned long HIT_WINDOW = 30;
+const unsigned long LOCKOUT_TIME = 50;
+
+void setup() {
+  pinMode(s0, OUTPUT);
+  pinMode(s1, OUTPUT);
+  pinMode(s2, OUTPUT);
+  pinMode(s3, OUTPUT);
+}
+
+void loop() {
+  int maxValue = 0;
+  int maxIndex = -1;
+  unsigned long now = millis();
+
+  for (int i = 0; i < NUM_DRUMS; i++) {
+    selectMuxChannel(drums[i].channel);
+    delayMicroseconds(1000);
+
+    int value = analogRead(muxAnalogPin);
+
+    if (value > drums[i].peak) {
+      drums[i].peak = value;
+    }
+
+    if (value > drums[i].threshold &&
+        (now - drums[i].lastHitTime) > drums[i].minTimeBetweenHits) {
+
+      if (value > maxValue) {
+        maxValue = value;
+        maxIndex = i;
+      }
+    }
+  }
+
+  if (maxIndex != -1) {
+    Drum &d = drums[maxIndex];
+
+    int velocity = map(d.peak, d.threshold, 900, 40, 127);
+    velocity = constrain(velocity, 40, 127);
+
+    noteOn(d.note, velocity);
+    delay(5);
+    noteOff(d.note);
+
+    d.lastHitTime = now;
+  }
+
+  for (int i = 0; i < NUM_DRUMS; i++) {
+    if (now - drums[i].lastHitTime > HIT_WINDOW) {
+      drums[i].peak = 0;
+    }
+  }
+
+  delay(1);
+}
+
+void selectMuxChannel(byte channel) {
+  digitalWrite(s0, channel & 0x01);
+  digitalWrite(s1, (channel >> 1) & 0x01);
+  digitalWrite(s2, (channel >> 2) & 0x01);
+  digitalWrite(s3, (channel >> 3) & 0x01);
+}
+
+void noteOn(byte pitch, byte velocity) {
+  midiEventPacket_t event = {0x09, 0x90, pitch, velocity};
+  MidiUSB.sendMIDI(event);
+  MidiUSB.flush();
+}
+
+void noteOff(byte pitch) {
+  midiEventPacket_t event = {0x08, 0x80, pitch, 0};
+  MidiUSB.sendMIDI(event);
+  MidiUSB.flush();
+}
+```
+
+When hitting the snare the digital snare sound keeps ringing for a while, it because i use bigger resistor so it’s more sensitive to vibrations. + still some cross-talk
+
+2.1 ‼️ Try to stop the ringing
+
+***Coding part:*** 
+
+```
+#include "MIDIUSB.h"
+
+const int muxAnalogPin = A0;
+const int s0 = 2, s1 = 3, s2 = 4, s3 = 5;
+
+const byte NUM_DRUMS = 11;
+
+struct Drum {
+  byte channel;
+  byte note;
+  int threshold;
+  int peak;
+  bool isHit;
+  unsigned long lastHitTime;
+  unsigned long minTimeBetweenHits;
+};
+
+Drum drums[NUM_DRUMS] = {
+  {1,  34, 90,  0, false, 0, 70},  // Snare
+  {2,  42, 80,  0, false, 0, 40},  // Hi-hat
+  {3,  50, 90,  0, false, 0, 70},  // High Tom
+  {4,  36, 120, 0, false, 0, 90},  // Kick
+  {5,  49, 100, 0, false, 0, 120}, // Crash 1
+  {6,  55, 95,  0, false, 0, 120}, // Splash (kit in logic pro heeft geen splash)
+  {7,  57, 100, 0, false, 0, 120}, // Crash 2
+  {8,  43, 90,  0, false, 0, 80},  // Floor Tom 1
+  {9,  51, 95,  0, false, 0, 100}, // Ride
+  {10,  41, 90,  0, false, 0, 80}, // Floor Tom 2 (kit in logic pro heeft geen floor tom 2)
+  {11, 52, 100, 0, false, 0, 120}  // China (kit in logic pro heeft geen china)
+};
+
+const unsigned long HIT_WINDOW = 30;
+const unsigned long LOCKOUT_TIME = 50;
+
+void setup() {
+  pinMode(s0, OUTPUT);
+  pinMode(s1, OUTPUT);
+  pinMode(s2, OUTPUT);
+  pinMode(s3, OUTPUT);
+}
+
+void loop() {
+  int maxValue = 0;
+  int maxIndex = -1;
+  unsigned long now = millis();
+
+  for (int i = 0; i < NUM_DRUMS; i++) {
+    selectMuxChannel(drums[i].channel);
+    delayMicroseconds(1000);
+
+    int value = analogRead(muxAnalogPin);
+
+    if (value > drums[i].peak) {
+      drums[i].peak = value;
+    }
+
+    if (value > drums[i].threshold &&
+        (now - drums[i].lastHitTime) > drums[i].minTimeBetweenHits) {
+
+      if (value > maxValue) {
+        maxValue = value;
+        maxIndex = i;
+      }
+    }
+  }
+
+  if (maxIndex != -1) {
+    Drum &d = drums[maxIndex];
+
+    int velocity = map(d.peak, d.threshold, 900, 40, 127);
+    velocity = constrain(velocity, 40, 127);
+
+    noteOn(d.note, velocity);
+    delay(5);
+    noteOff(d.note);
+
+    d.lastHitTime = now;
+  }
+
+  for (int i = 0; i < NUM_DRUMS; i++) {
+    if (now - drums[i].lastHitTime > HIT_WINDOW) {
+      drums[i].peak = 0;
+    }
+  }
+
+  delay(1);
+}
+
+void selectMuxChannel(byte channel) {
+  digitalWrite(s0, channel & 0x01);
+  digitalWrite(s1, (channel >> 1) & 0x01);
+  digitalWrite(s2, (channel >> 2) & 0x01);
+  digitalWrite(s3, (channel >> 3) & 0x01);
+}
+
+void noteOn(byte pitch, byte velocity) {
+  midiEventPacket_t event = {0x09, 0x90, pitch, velocity};
+  MidiUSB.sendMIDI(event);
+  MidiUSB.flush();
+}
+
+void noteOff(byte pitch) {
+  midiEventPacket_t event = {0x08, 0x80, pitch, 0};
+  MidiUSB.sendMIDI(event);
+  MidiUSB.flush();
+}
+
+```
+
+When hitting the snare the digital snare sound isn’t always coming thru, the vibrations are only detected when hitting the drum hear near the rim were the sensor is placed.
+
+2.2 ‼️ Try to stop the ringing
+
+***Coding part:*** 
+
+```
+#include "MIDIUSB.h"
+
+const int muxAnalogPin = A0;
+const int s0 = 2, s1 = 3, s2 = 4, s3 = 5;
+
+const byte NUM_DRUMS = 11;
+
+struct Drum {
+  byte channel;
+  byte note;
+  int threshold;
+  int peak;
+  bool isHit;
+  unsigned long lastHitTime;
+  unsigned long minTimeBetweenHits;
+};
+
+Drum drums[NUM_DRUMS] = {
+  {1,  34, 90,  0, false, 0, 70},  // Snare
+  {2,  42, 80,  0, false, 0, 40},  // Hi-hat
+  {3,  50, 90,  0, false, 0, 70},  // High Tom
+  {4,  36, 120, 0, false, 0, 90},  // Kick
+  {5,  49, 100, 0, false, 0, 120}, // Crash 1
+  {6,  55, 95,  0, false, 0, 120}, // Splash (kit in logic pro heeft geen splash)
+  {7,  57, 100, 0, false, 0, 120}, // Crash 2
+  {8,  43, 90,  0, false, 0, 80},  // Floor Tom 1
+  {9,  51, 95,  0, false, 0, 100}, // Ride
+  {10,  41, 90,  0, false, 0, 80}, // Floor Tom 2 (kit in logic pro heeft geen floor tom 2)
+  {11, 52, 100, 0, false, 0, 120}  // China (kit in logic pro heeft geen china)
+};
+
+const unsigned long HIT_WINDOW = 30;
+const unsigned long LOCKOUT_TIME = 50;
+
+void setup() {
+  pinMode(s0, OUTPUT);
+  pinMode(s1, OUTPUT);
+  pinMode(s2, OUTPUT);
+  pinMode(s3, OUTPUT);
+}
+
+void loop() {
+  int maxValue = 0;
+  int maxIndex = -1;
+  unsigned long now = millis();
+
+  for (int i = 0; i < NUM_DRUMS; i++) {
+    selectMuxChannel(drums[i].channel);
+    delayMicroseconds(1000);
+
+    int value = analogRead(muxAnalogPin);
+
+    if (value > drums[i].peak) {
+      drums[i].peak = value;
+    }
+
+    if (value > drums[i].threshold &&
+        (now - drums[i].lastHitTime) > drums[i].minTimeBetweenHits) {
+
+      if (value > maxValue) {
+        maxValue = value;
+        maxIndex = i;
+      }
+    }
+  }
+
+  if (maxIndex != -1) {
+    Drum &d = drums[maxIndex];
+
+    int velocity = map(d.peak, d.threshold, 900, 40, 127);
+    velocity = constrain(velocity, 40, 127);
+
+    noteOn(d.note, velocity);
+    delay(5);
+    noteOff(d.note);
+
+    d.lastHitTime = now;
+  }
+
+  for (int i = 0; i < NUM_DRUMS; i++) {
+    if (now - drums[i].lastHitTime > HIT_WINDOW) {
+      drums[i].peak = 0;
+    }
+  }
+
+  delay(1);
+}
+
+void selectMuxChannel(byte channel) {
+  digitalWrite(s0, channel & 0x01);
+  digitalWrite(s1, (channel >> 1) & 0x01);
+  digitalWrite(s2, (channel >> 2) & 0x01);
+  digitalWrite(s3, (channel >> 3) & 0x01);
+}
+
+void noteOn(byte pitch, byte velocity) {
+  midiEventPacket_t event = {0x09, 0x90, pitch, velocity};
+  MidiUSB.sendMIDI(event);
+  MidiUSB.flush();
+}
+
+void noteOff(byte pitch) {
+  midiEventPacket_t event = {0x08, 0x80, pitch, 0};
+  MidiUSB.sendMIDI(event);
+  MidiUSB.flush();
+}
+
+```
+
+The ringing is gone, but now the rythmic is not that good + still cross-talk when hitting the drum real hard.
 
 1. **wired-up all piezo element thru Mux to my Arduino board and hang it on my drum kit and try to make different drum sounds for the piezo element with MIDI thru Logic Pro when giving vibration to the piezo element**
 

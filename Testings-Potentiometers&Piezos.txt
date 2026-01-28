@@ -201,6 +201,7 @@ void noteOff(byte pitch, byte channel) {
 
 Now all the 16 different samples can be selected with the potentiometer and can be heard. 
 
+
 # Second Testing Demo with Potentiometers
 
 1. **wired-up multiple potentiometer to multiple piezo element to my Arduino board and try to change the different sounds when turning the potentiometers from the different piezo vibrations**
@@ -313,24 +314,472 @@ void noteOff(byte pitch, byte channel) {
 
 I assigned different pot values to different notes so when i change the potentiometers value, there is a different value sent to Arduino IDE, in Arduino IDE there are different notes assigned to different values, and than Arduino IDE sends that MIDI note to Logic Pro. I wire-up a second piezo sensor and a second potentiometer and I made a kick kit for them with all kick samples, they can both play at the same time and both the piezo’s and potentiometers work separately and good.
 
+
 # Third Testing Demo with Piezo Elements
-
-1. **wired-up 1 piezo element thru Mux with it’s own potentiometer thru a second Mux to my Arduino board and try to make different drum sounds for the different piezo elements with MIDI thru Logic Pro when giving vibration to the piezo elements**
-
-***Coding part:***
-
-1. **wired-up 2 piezo element thru Mux with each it’s own potentiometer thru a second Mux to my Arduino board and try to make different drum sounds for the different piezo elements with MIDI thru Logic Pro when giving vibration to the piezo elements**
-
-***Coding part:***
-
-# Fourth Testing Demo with Piezo Elements
 
 1. **wired-up all piezo element thru Mux with each it’s own potentiometer thru a second Mux to my Arduino board and try to make different drum sounds for the different piezo elements with MIDI thru Logic Pro when giving vibration to the piezo elements**
 
-***Coding part:***
+***Software:***
 
-# Fifth Testing Demo with Piezo Elements
+Logic Pro:
+
+I made for each piezo sensor a kit with 16 samples
+
+***Coding part:*** 
+
+```
+#include "MIDIUSB.h"
+
+const int PIEZO_S0 = 2;
+const int PIEZO_S1 = 3;
+const int PIEZO_S2 = 4;
+const int PIEZO_S3 = 5;
+const int PIEZO_MUX_SIG = A0;
+
+const int POT_S0 = 6;
+const int POT_S1 = 7;
+const int POT_S2 = 8;
+const int POT_S3 = 9;
+const int POT_MUX_SIG = A1;
+
+struct Piezo {
+  byte muxChannel;
+  int threshold;
+  int peak;
+  bool isHit;
+  unsigned long lastHitTime;
+  unsigned long noteOffTime;
+};
+
+Piezo piezo1 = {1, 90, 0, false, 0, 0}; //snare
+Piezo piezo2 = {2, 80, 0, false, 0, 0}; //hihat
+Piezo piezo3 = {3, 90, 0, false, 0, 0}; //high tom
+Piezo piezo4 = {4, 120, 0, false, 0, 0}; //kick
+Piezo piezo5 = {5, 100, 0, false, 0, 0}; //crash 1
+Piezo piezo6 = {6, 95, 0, false, 0, 0}; //splash
+Piezo piezo7 = {7, 100, 0, false, 0, 0}; //crash 2
+Piezo piezo8 = {8, 90, 0, false, 0, 0}; //floor 1
+Piezo piezo9 = {9, 95, 0, false, 0, 0}; //ride
+Piezo piezo10 = {10, 90, 0, false, 0, 0}; //floor 2
+Piezo piezo11 = {11, 100, 0, false, 0, 0}; //china
+
+const byte pot1Channel = 1;
+const byte pot2Channel = 2;
+const byte pot3Channel = 3;
+const byte pot4Channel = 4;
+const byte pot5Channel = 5;
+const byte pot6Channel = 6;
+const byte pot7Channel = 7;
+const byte pot8Channel = 8;
+const byte pot9Channel = 9;
+const byte pot10Channel = 10;
+const byte pot11Channel = 11;
+
+// snare
+const byte track1Notes[16] = {
+  59,60,61,62,63,64,65,66,
+  67,68,69,70,71,72,73,74
+};
+//hihat
+const byte track2Notes[16] = {
+  53,54,55,56,57,58,59,60,
+  61,62,63,64,65,66,67,68
+};
+//high tom
+const byte track3Notes[16] = {
+  36,37,38,39,40,41,42,43,
+  44,45,46,47,48,49,50,51
+};
+// kick
+const byte track4Notes[16] = {
+  2,3,4,5,6,7,8,9,
+  10,11,12,13,14,15,16,17
+};
+// crash 1
+const byte track5Notes[16] = {
+  36,37,38,39,40,41,42,43,
+  44,45,46,47,48,49,50,51
+};
+// splash
+const byte track6Notes[16] = {
+  36,37,38,39,40,41,42,43,
+  44,45,46,47,48,49,50,51
+};
+// crash 2
+const byte track7Notes[16] = {
+  36,37,38,39,40,41,42,43,
+  44,45,46,47,48,49,50,51
+};
+// floor 1
+const byte track8Notes[16] = {
+  36,37,38,39,40,41,42,43,
+  44,45,46,47,48,49,50,51
+};
+// ride
+const byte track9Notes[16] = {
+  36,37,38,39,40,41,42,43,
+  44,45,46,47,48,49,50,51
+};
+// floor 2
+const byte track10Notes[16] = {
+  36,37,38,39,40,41,42,43,
+  44,45,46,47,48,49,50,51
+};
+// china
+const byte track11Notes[16] = {
+  36,37,38,39,40,41,42,43,
+  44,45,46,47,48,49,50,51
+};
+
+const int minVelocity = 40;
+const int maxVelocity = 127;
+const unsigned long lockoutTime = 40;
+
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(PIEZO_S0, OUTPUT);
+  pinMode(PIEZO_S1, OUTPUT);
+  pinMode(PIEZO_S2, OUTPUT);
+  pinMode(PIEZO_S3, OUTPUT);
+
+  pinMode(POT_S0, OUTPUT);
+  pinMode(POT_S1, OUTPUT);
+  pinMode(POT_S2, OUTPUT);
+  pinMode(POT_S3, OUTPUT);
+}
+
+void loop() {
+  unsigned long now = millis();
+
+  int pot1Value = readPotMux(pot1Channel);
+  int pot2Value = readPotMux(pot2Channel);
+  int pot3Value = readPotMux(pot3Channel);
+  int pot4Value = readPotMux(pot4Channel);
+  int pot5Value = readPotMux(pot5Channel);
+  int pot6Value = readPotMux(pot6Channel);
+  int pot7Value = readPotMux(pot7Channel);
+  int pot8Value = readPotMux(pot8Channel);
+  int pot9Value = readPotMux(pot9Channel);
+  int pot10Value = readPotMux(pot10Channel);
+  int pot11Value = readPotMux(pot11Channel);
+
+  int zone1 = constrain(pot1Value / 64, 0, 15);
+  int zone2 = constrain(pot2Value / 64, 0, 15);
+  int zone3 = constrain(pot3Value / 64, 0, 15);
+  int zone4 = constrain(pot4Value / 64, 0, 15);
+  int zone5 = constrain(pot5Value / 64, 0, 15);
+  int zone6 = constrain(pot6Value / 64, 0, 15);
+  int zone7 = constrain(pot7Value / 64, 0, 15);
+  int zone8 = constrain(pot8Value / 64, 0, 15);
+  int zone9 = constrain(pot9Value / 64, 0, 15);
+  int zone10 = constrain(pot10Value / 64, 0, 15);
+  int zone11 = constrain(pot11Value / 64, 0, 15);
+
+  handlePiezo(piezo1, now, track1Notes[zone1], 1);
+  handlePiezo(piezo2, now, track2Notes[zone2], 2);
+  handlePiezo(piezo3, now, track3Notes[zone3], 3);
+  handlePiezo(piezo4, now, track4Notes[zone4], 4);
+  handlePiezo(piezo5, now, track5Notes[zone5], 5);
+  handlePiezo(piezo6, now, track6Notes[zone6], 6);
+  handlePiezo(piezo7, now, track7Notes[zone7], 7);
+  handlePiezo(piezo8, now, track8Notes[zone8], 8);
+  handlePiezo(piezo9, now, track9Notes[zone9], 9);
+  handlePiezo(piezo10, now, track10Notes[zone10], 10);
+  handlePiezo(piezo11, now, track11Notes[zone11], 11);
+
+  delayMicroseconds(300);
+}
+
+int readPiezoMux(byte channel) {
+  digitalWrite(PIEZO_S0, bitRead(channel, 0));
+  digitalWrite(PIEZO_S1, bitRead(channel, 1));
+  digitalWrite(PIEZO_S2, bitRead(channel, 2));
+  digitalWrite(PIEZO_S3, bitRead(channel, 3));
+  delayMicroseconds(5);
+  return analogRead(PIEZO_MUX_SIG);
+}
+
+int readPotMux(byte channel) {
+  digitalWrite(POT_S0, bitRead(channel, 0));
+  digitalWrite(POT_S1, bitRead(channel, 1));
+  digitalWrite(POT_S2, bitRead(channel, 2));
+  digitalWrite(POT_S3, bitRead(channel, 3));
+  delayMicroseconds(5);
+  return analogRead(POT_MUX_SIG);
+}
+
+void handlePiezo(Piezo &p, unsigned long now, byte midiNote, byte channel) {
+  int value = readPiezoMux(p.muxChannel);
+
+  if (value > p.peak) p.peak = value;
+
+  if (value > p.threshold && !p.isHit && now - p.lastHitTime > lockoutTime) {
+    p.isHit = true;
+    p.peak = value;
+  }
+
+  if (p.isHit && value < p.threshold / 2) {
+    int velocity = map(p.peak, p.threshold, 900, minVelocity, maxVelocity);
+    velocity = constrain(velocity, minVelocity, maxVelocity);
+
+    noteOn(midiNote, velocity, channel);
+
+    p.isHit = false;
+    p.peak = 0;
+    p.lastHitTime = now;
+  }
+}
+
+void noteOn(byte pitch, byte velocity, byte channel) {
+  midiEventPacket_t event = {0x09, 0x90 + (channel - 1), pitch, velocity};
+  MidiUSB.sendMIDI(event);
+  MidiUSB.flush();
+}
+
+void noteOff(byte pitch, byte channel) {
+  midiEventPacket_t event = {0x08, 0x80 + (channel - 1), pitch, 0};
+  MidiUSB.sendMIDI(event);
+  MidiUSB.flush();
+}
+```
+
+now i used the code from before and added piezo’s and pots and added 2 Mux in the code so it knows that the piezo’s and pots go thru Mux. I removed the noteOffTime and the noteDuration so that each sample can be fully played. The only thing i have is that when i play the same note after each other for a long time, the note dies and that kit can’t give any sound anymore, when i restart logic it’s back normal.
+
+
+# Fourth Testing Demo with Piezo Elements
 
 1. **wired-up all piezo element thru Mux with each it’s own potentiometer thru a second Mux to my Arduino board and hang them on my drum kit and try to make different drum sounds for the different piezo elements with MIDI thru Logic Pro when giving vibration to the piezo elements**
+
+***Coding part:*** 
+
+```
+#include "MIDIUSB.h"
+
+const int PIEZO_S0 = 2;
+const int PIEZO_S1 = 3;
+const int PIEZO_S2 = 4;
+const int PIEZO_S3 = 5;
+const int PIEZO_MUX_SIG = A0;
+
+const int POT_S0 = 6;
+const int POT_S1 = 7;
+const int POT_S2 = 8;
+const int POT_S3 = 9;
+const int POT_MUX_SIG = A1;
+
+struct Piezo {
+  byte muxChannel;
+  int threshold;
+  int peak;
+  bool isHit;
+  unsigned long lastHitTime;
+  unsigned long noteOffTime;
+};
+
+Piezo piezo1 = {1, 90, 0, false, 0, 0}; //snare
+Piezo piezo2 = {2, 80, 0, false, 0, 0}; //hihat
+Piezo piezo3 = {3, 90, 0, false, 0, 0}; //high tom
+Piezo piezo4 = {4, 120, 0, false, 0, 0}; //kick
+Piezo piezo5 = {5, 100, 0, false, 0, 0}; //crash 1
+Piezo piezo6 = {6, 95, 0, false, 0, 0}; //splash
+Piezo piezo7 = {7, 100, 0, false, 0, 0}; //crash 2
+Piezo piezo8 = {8, 90, 0, false, 0, 0}; //floor 1
+Piezo piezo9 = {9, 95, 0, false, 0, 0}; //ride
+Piezo piezo10 = {10, 90, 0, false, 0, 0}; //floor 2
+Piezo piezo11 = {11, 100, 0, false, 0, 0}; //china
+
+const byte pot1Channel = 1;
+const byte pot2Channel = 2;
+const byte pot3Channel = 3;
+const byte pot4Channel = 4;
+const byte pot5Channel = 5;
+const byte pot6Channel = 6;
+const byte pot7Channel = 7;
+const byte pot8Channel = 8;
+const byte pot9Channel = 9;
+const byte pot10Channel = 10;
+const byte pot11Channel = 11;
+
+// snare
+const byte track1Notes[16] = {
+  59,60,61,62,63,64,65,66,
+  67,68,69,70,71,72,73,74
+};
+//hihat
+const byte track2Notes[16] = {
+  53,54,55,56,57,58,59,60,
+  61,62,63,64,65,66,67,68
+};
+//high tom
+const byte track3Notes[16] = {
+  36,37,38,39,40,41,42,43,
+  44,45,46,47,48,49,50,51
+};
+// kick
+const byte track4Notes[16] = {
+  2,3,4,5,6,7,8,9,
+  10,11,12,13,14,15,16,17
+};
+// crash 1
+const byte track5Notes[16] = {
+  36,37,38,39,40,41,42,43,
+  44,45,46,47,48,49,50,51
+};
+// splash
+const byte track6Notes[16] = {
+  36,37,38,39,40,41,42,43,
+  44,45,46,47,48,49,50,51
+};
+// crash 2
+const byte track7Notes[16] = {
+  36,37,38,39,40,41,42,43,
+  44,45,46,47,48,49,50,51
+};
+// floor 1
+const byte track8Notes[16] = {
+  36,37,38,39,40,41,42,43,
+  44,45,46,47,48,49,50,51
+};
+// ride
+const byte track9Notes[16] = {
+  36,37,38,39,40,41,42,43,
+  44,45,46,47,48,49,50,51
+};
+// floor 2
+const byte track10Notes[16] = {
+  36,37,38,39,40,41,42,43,
+  44,45,46,47,48,49,50,51
+};
+// china
+const byte track11Notes[16] = {
+  36,37,38,39,40,41,42,43,
+  44,45,46,47,48,49,50,51
+};
+
+const int minVelocity = 40;
+const int maxVelocity = 127;
+const unsigned long lockoutTime = 40;
+
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(PIEZO_S0, OUTPUT);
+  pinMode(PIEZO_S1, OUTPUT);
+  pinMode(PIEZO_S2, OUTPUT);
+  pinMode(PIEZO_S3, OUTPUT);
+
+  pinMode(POT_S0, OUTPUT);
+  pinMode(POT_S1, OUTPUT);
+  pinMode(POT_S2, OUTPUT);
+  pinMode(POT_S3, OUTPUT);
+}
+
+void loop() {
+  unsigned long now = millis();
+
+  int pot1Value = readPotMux(pot1Channel);
+  int pot2Value = readPotMux(pot2Channel);
+  int pot3Value = readPotMux(pot3Channel);
+  int pot4Value = readPotMux(pot4Channel);
+  int pot5Value = readPotMux(pot5Channel);
+  int pot6Value = readPotMux(pot6Channel);
+  int pot7Value = readPotMux(pot7Channel);
+  int pot8Value = readPotMux(pot8Channel);
+  int pot9Value = readPotMux(pot9Channel);
+  int pot10Value = readPotMux(pot10Channel);
+  int pot11Value = readPotMux(pot11Channel);
+
+  int zone1 = constrain(pot1Value / 64, 0, 15);
+  int zone2 = constrain(pot2Value / 64, 0, 15);
+  int zone3 = constrain(pot3Value / 64, 0, 15);
+  int zone4 = constrain(pot4Value / 64, 0, 15);
+  int zone5 = constrain(pot5Value / 64, 0, 15);
+  int zone6 = constrain(pot6Value / 64, 0, 15);
+  int zone7 = constrain(pot7Value / 64, 0, 15);
+  int zone8 = constrain(pot8Value / 64, 0, 15);
+  int zone9 = constrain(pot9Value / 64, 0, 15);
+  int zone10 = constrain(pot10Value / 64, 0, 15);
+  int zone11 = constrain(pot11Value / 64, 0, 15);
+
+  handlePiezo(piezo1, now, track1Notes[zone1], 1);
+  handlePiezo(piezo2, now, track2Notes[zone2], 2);
+  handlePiezo(piezo3, now, track3Notes[zone3], 3);
+  handlePiezo(piezo4, now, track4Notes[zone4], 4);
+  handlePiezo(piezo5, now, track5Notes[zone5], 5);
+  handlePiezo(piezo6, now, track6Notes[zone6], 6);
+  handlePiezo(piezo7, now, track7Notes[zone7], 7);
+  handlePiezo(piezo8, now, track8Notes[zone8], 8);
+  handlePiezo(piezo9, now, track9Notes[zone9], 9);
+  handlePiezo(piezo10, now, track10Notes[zone10], 10);
+  handlePiezo(piezo11, now, track11Notes[zone11], 11);
+
+  delayMicroseconds(300);
+}
+
+int readPiezoMux(byte channel) {
+  digitalWrite(PIEZO_S0, bitRead(channel, 0));
+  digitalWrite(PIEZO_S1, bitRead(channel, 1));
+  digitalWrite(PIEZO_S2, bitRead(channel, 2));
+  digitalWrite(PIEZO_S3, bitRead(channel, 3));
+  delayMicroseconds(5);
+  return analogRead(PIEZO_MUX_SIG);
+}
+
+int readPotMux(byte channel) {
+  digitalWrite(POT_S0, bitRead(channel, 0));
+  digitalWrite(POT_S1, bitRead(channel, 1));
+  digitalWrite(POT_S2, bitRead(channel, 2));
+  digitalWrite(POT_S3, bitRead(channel, 3));
+  delayMicroseconds(5);
+  return analogRead(POT_MUX_SIG);
+}
+
+void handlePiezo(Piezo &p, unsigned long now, byte midiNote, byte channel) {
+  int value = readPiezoMux(p.muxChannel);
+
+  if (value > p.peak) p.peak = value;
+
+  if (value > p.threshold && !p.isHit && now - p.lastHitTime > lockoutTime) {
+    p.isHit = true;
+    p.peak = value;
+  }
+
+  if (p.isHit && value < p.threshold / 2) {
+    int velocity = map(p.peak, p.threshold, 900, minVelocity, maxVelocity);
+    velocity = constrain(velocity, minVelocity, maxVelocity);
+
+    noteOn(midiNote, velocity, channel);
+
+    p.isHit = false;
+    p.peak = 0;
+    p.lastHitTime = now;
+  }
+}
+
+void noteOn(byte pitch, byte velocity, byte channel) {
+  midiEventPacket_t event = {0x09, 0x90 + (channel - 1), pitch, velocity};
+  MidiUSB.sendMIDI(event);
+  MidiUSB.flush();
+}
+
+void noteOff(byte pitch, byte channel) {
+  midiEventPacket_t event = {0x08, 0x80 + (channel - 1), pitch, 0};
+  MidiUSB.sendMIDI(event);
+  MidiUSB.flush();
+}
+```
+
+It works when hitting the drums slow, the sounds is a little delayed with the actual hit so i need to fix that so it’s real tight. the crash 2 doesn’t respond so that’s something i need to fix. When drumming fast the rythmic isn’t correct. There is also some cross-talk when hitting a drum hard (piezo get overload with spikes → mux can’t handle that spike and let’s it go over all the channels), so it need to fix that. + The only thing i have is that when i play the same note after each other for a long time, the note dies and that kit can’t give any sound anymore, when i restart logic pro it’s back normal.
+
+1.1 Try to fix the rhythm, cross-talk (hard spikes when hard hits), ringing and delay + fixing logic pro so the note won’t die after long playing
+
+***Software:***
+
+Audio MIDI Setup:
+
+stays the same as before
+
+Logic Pro:
 
 ***Coding part:***
