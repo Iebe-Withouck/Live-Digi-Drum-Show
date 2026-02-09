@@ -12,98 +12,64 @@ const int POT_S2 = 8;
 const int POT_S3 = 9;
 const int POT_MUX_SIG = A1;
 
+const int VOLUME_POT_PIN = A2;
+const byte VOLUME_CC = 7;
+int lastVolumeValue = -1;
+
+const unsigned long scanTime = 10;
+const unsigned long maskTime = 250;
+const int retriggerThreshold = 25;
+
+const int minVelocity = 35;
+const int maxVelocity = 127;
+
 struct Piezo {
   byte muxChannel;
   int threshold;
   int peak;
-  bool isHit;
-  unsigned long lastHitTime;
-  unsigned long noteOffTime;
+  bool scanning;
+  unsigned long scanEnd;
+  unsigned long maskEnd;
+  byte lastNote;
+  byte lastChannel;
+  bool ready;
 };
 
-Piezo piezo1 = {1, 90, 0, false, 0, 0}; //snare
-Piezo piezo2 = {2, 80, 0, false, 0, 0}; //hihat
-Piezo piezo3 = {3, 90, 0, false, 0, 0}; //high tom
-Piezo piezo4 = {4, 120, 0, false, 0, 0}; //kick
-Piezo piezo5 = {5, 100, 0, false, 0, 0}; //crash 1
-Piezo piezo6 = {6, 95, 0, false, 0, 0}; //splash
-Piezo piezo7 = {7, 100, 0, false, 0, 0}; //crash 2
-Piezo piezo8 = {8, 90, 0, false, 0, 0}; //floor 1
-Piezo piezo9 = {9, 95, 0, false, 0, 0}; //ride
-Piezo piezo10 = {10, 90, 0, false, 0, 0}; //floor 2
-Piezo piezo11 = {11, 100, 0, false, 0, 0}; //china
+Piezo piezo1  = {1,90,0,false,0,0,0,0,true};
+Piezo piezo2  = {2,80,0,false,0,0,0,0,true};
+Piezo piezo3  = {3,90,0,false,0,0,0,0,true};
+Piezo piezo4  = {4,120,0,false,0,0,0,0,true};
+Piezo piezo5  = {5,100,0,false,0,0,0,0,true};
+Piezo piezo6  = {6,95,0,false,0,0,0,0,true};
+Piezo piezo7  = {7,100,0,false,0,0,0,0,true};
+Piezo piezo8  = {8,90,0,false,0,0,0,0,true};
+Piezo piezo9  = {9,95,0,false,0,0,0,0,true};
+Piezo piezo10 = {10,90,0,false,0,0,0,0,true};
+Piezo piezo11 = {11,100,0,false,0,0,0,0,true};
 
-const byte pot1Channel = 1;
-const byte pot2Channel = 2;
-const byte pot3Channel = 3;
-const byte pot4Channel = 4;
-const byte pot5Channel = 5;
-const byte pot6Channel = 6;
-const byte pot7Channel = 7;
-const byte pot8Channel = 8;
-const byte pot9Channel = 9;
+const byte pot1Channel  = 1;
+const byte pot2Channel  = 2;
+const byte pot3Channel  = 3;
+const byte pot4Channel  = 4;
+const byte pot5Channel  = 5;
+const byte pot6Channel  = 6;
+const byte pot7Channel  = 7;
+const byte pot8Channel  = 8;
+const byte pot9Channel  = 9;
 const byte pot10Channel = 10;
 const byte pot11Channel = 11;
 
-// snare
-const byte track1Notes[16] = {
-  59,60,61,62,63,64,65,66,
-  67,68,69,70,71,72,73,74
-};
-//hihat
-const byte track2Notes[16] = {
-  53,54,55,56,57,58,59,60,
-  61,62,63,64,65,66,67,68
-};
-//high tom
-const byte track3Notes[16] = {
-  36,37,38,39,40,41,42,43,
-  44,45,46,47,48,49,50,51
-};
-// kick
-const byte track4Notes[16] = {
-  2,3,4,5,6,7,8,9,
-  10,11,12,13,14,15,16,17
-};
-// crash 1
-const byte track5Notes[16] = {
-  36,37,38,39,40,41,42,43,
-  44,45,46,47,48,49,50,51
-};
-// splash
-const byte track6Notes[16] = {
-  36,37,38,39,40,41,42,43,
-  44,45,46,47,48,49,50,51
-};
-// crash 2
-const byte track7Notes[16] = {
-  36,37,38,39,40,41,42,43,
-  44,45,46,47,48,49,50,51
-};
-// floor 1
-const byte track8Notes[16] = {
-  36,37,38,39,40,41,42,43,
-  44,45,46,47,48,49,50,51
-};
-// ride
-const byte track9Notes[16] = {
-  36,37,38,39,40,41,42,43,
-  44,45,46,47,48,49,50,51
-};
-// floor 2
-const byte track10Notes[16] = {
-  36,37,38,39,40,41,42,43,
-  44,45,46,47,48,49,50,51
-};
-// china
-const byte track11Notes[16] = {
-  36,37,38,39,40,41,42,43,
-  44,45,46,47,48,49,50,51
-};
-
-const int minVelocity = 40;
-const int maxVelocity = 127;
-const unsigned long lockoutTime = 40;
+const byte track1Notes[16]  = {59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74};
+const byte track2Notes[16]  = {53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68};
+const byte track3Notes[16]  = {36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51};
+const byte track4Notes[16]  = {2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17};
+const byte track5Notes[16]  = {36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51};
+const byte track6Notes[16]  = {36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51};
+const byte track7Notes[16]  = {36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51};
+const byte track8Notes[16]  = {36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51};
+const byte track9Notes[16]  = {36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51};
+const byte track10Notes[16] = {36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51};
+const byte track11Notes[16] = {36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51};
 
 void setup() {
   Serial.begin(115200);
@@ -122,93 +88,102 @@ void setup() {
 void loop() {
   unsigned long now = millis();
 
-  int pot1Value = readPotMux(pot1Channel);
-  int pot2Value = readPotMux(pot2Channel);
-  int pot3Value = readPotMux(pot3Channel);
-  int pot4Value = readPotMux(pot4Channel);
-  int pot5Value = readPotMux(pot5Channel);
-  int pot6Value = readPotMux(pot6Channel);
-  int pot7Value = readPotMux(pot7Channel);
-  int pot8Value = readPotMux(pot8Channel);
-  int pot9Value = readPotMux(pot9Channel);
-  int pot10Value = readPotMux(pot10Channel);
-  int pot11Value = readPotMux(pot11Channel);
+  int rawVolume = analogRead(VOLUME_POT_PIN);
+  int volumeValue = map(rawVolume, 0, 1023, 0, 127);
+  if (volumeValue != lastVolumeValue) {
+    for (byte ch = 1; ch <= 11; ch++) controlChange(VOLUME_CC, volumeValue, ch);
+    lastVolumeValue = volumeValue;
+  }
 
-  int zone1 = constrain(pot1Value / 64, 0, 15);
-  int zone2 = constrain(pot2Value / 64, 0, 15);
-  int zone3 = constrain(pot3Value / 64, 0, 15);
-  int zone4 = constrain(pot4Value / 64, 0, 15);
-  int zone5 = constrain(pot5Value / 64, 0, 15);
-  int zone6 = constrain(pot6Value / 64, 0, 15);
-  int zone7 = constrain(pot7Value / 64, 0, 15);
-  int zone8 = constrain(pot8Value / 64, 0, 15);
-  int zone9 = constrain(pot9Value / 64, 0, 15);
-  int zone10 = constrain(pot10Value / 64, 0, 15);
-  int zone11 = constrain(pot11Value / 64, 0, 15);
+  int zone1  = constrain(readPotMux(pot1Channel)  / 64, 0, 15);
+  int zone2  = constrain(readPotMux(pot2Channel)  / 64, 0, 15);
+  int zone3  = constrain(readPotMux(pot3Channel)  / 64, 0, 15);
+  int zone4  = constrain(readPotMux(pot4Channel)  / 64, 0, 15);
+  int zone5  = constrain(readPotMux(pot5Channel)  / 64, 0, 15);
+  int zone6  = constrain(readPotMux(pot6Channel)  / 64, 0, 15);
+  int zone7  = constrain(readPotMux(pot7Channel)  / 64, 0, 15);
+  int zone8  = constrain(readPotMux(pot8Channel)  / 64, 0, 15);
+  int zone9  = constrain(readPotMux(pot9Channel)  / 64, 0, 15);
+  int zone10 = constrain(readPotMux(pot10Channel) / 64, 0, 15);
+  int zone11 = constrain(readPotMux(pot11Channel) / 64, 0, 15);
 
-  handlePiezo(piezo1, now, track1Notes[zone1], 1);
-  handlePiezo(piezo2, now, track2Notes[zone2], 2);
-  handlePiezo(piezo3, now, track3Notes[zone3], 3);
-  handlePiezo(piezo4, now, track4Notes[zone4], 4);
-  handlePiezo(piezo5, now, track5Notes[zone5], 5);
-  handlePiezo(piezo6, now, track6Notes[zone6], 6);
-  handlePiezo(piezo7, now, track7Notes[zone7], 7);
-  handlePiezo(piezo8, now, track8Notes[zone8], 8);
-  handlePiezo(piezo9, now, track9Notes[zone9], 9);
-  handlePiezo(piezo10, now, track10Notes[zone10], 10);
-  handlePiezo(piezo11, now, track11Notes[zone11], 11);
+  handlePiezo(piezo1, now, track1Notes[zone1],1);
+  handlePiezo(piezo2, now, track2Notes[zone2],2);
+  handlePiezo(piezo3, now, track3Notes[zone3],3);
+  handlePiezo(piezo4, now, track4Notes[zone4],4);
+  handlePiezo(piezo5, now, track5Notes[zone5],5);
+  handlePiezo(piezo6, now, track6Notes[zone6],6);
+  handlePiezo(piezo7, now, track7Notes[zone7],7);
+  handlePiezo(piezo8, now, track8Notes[zone8],8);
+  handlePiezo(piezo9, now, track9Notes[zone9],9);
+  handlePiezo(piezo10, now, track10Notes[zone10],10);
+  handlePiezo(piezo11, now, track11Notes[zone11],11);
 
-  delayMicroseconds(300);
+  delayMicroseconds(250);
 }
 
-int readPiezoMux(byte channel) {
-  digitalWrite(PIEZO_S0, bitRead(channel, 0));
-  digitalWrite(PIEZO_S1, bitRead(channel, 1));
-  digitalWrite(PIEZO_S2, bitRead(channel, 2));
-  digitalWrite(PIEZO_S3, bitRead(channel, 3));
-  delayMicroseconds(5);
+int readPiezoMux(byte channel){
+  digitalWrite(PIEZO_S0, bitRead(channel,0));
+  digitalWrite(PIEZO_S1, bitRead(channel,1));
+  digitalWrite(PIEZO_S2, bitRead(channel,2));
+  digitalWrite(PIEZO_S3, bitRead(channel,3));
+  delayMicroseconds(4);
   return analogRead(PIEZO_MUX_SIG);
 }
 
-int readPotMux(byte channel) {
-  digitalWrite(POT_S0, bitRead(channel, 0));
-  digitalWrite(POT_S1, bitRead(channel, 1));
-  digitalWrite(POT_S2, bitRead(channel, 2));
-  digitalWrite(POT_S3, bitRead(channel, 3));
-  delayMicroseconds(5);
+int readPotMux(byte channel){
+  digitalWrite(POT_S0, bitRead(channel,0));
+  digitalWrite(POT_S1, bitRead(channel,1));
+  digitalWrite(POT_S2, bitRead(channel,2));
+  digitalWrite(POT_S3, bitRead(channel,3));
+  delayMicroseconds(4);
   return analogRead(POT_MUX_SIG);
 }
 
-void handlePiezo(Piezo &p, unsigned long now, byte midiNote, byte channel) {
-  int value = readPiezoMux(p.muxChannel);
+void handlePiezo(Piezo &p, unsigned long now, byte midiNote, byte channel){
+  int val = readPiezoMux(p.muxChannel);
 
-  if (value > p.peak) p.peak = value;
-
-  if (value > p.threshold && !p.isHit && now - p.lastHitTime > lockoutTime) {
-    p.isHit = true;
-    p.peak = value;
+  if(val < p.threshold - retriggerThreshold){
+    p.ready = true;
   }
 
-  if (p.isHit && value < p.threshold / 2) {
-    int velocity = map(p.peak, p.threshold, 900, minVelocity, maxVelocity);
-    velocity = constrain(velocity, minVelocity, maxVelocity);
+  if(now < p.maskEnd) return;
+  if(!p.ready) return;
 
-    noteOn(midiNote, velocity, channel);
+  if(!p.scanning){
+    if(val > p.threshold){
+      p.scanning = true;
+      p.peak = val;
+      p.scanEnd = now + scanTime;
+      p.lastNote = midiNote;
+      p.lastChannel = channel;
+      p.ready = false;
+    }
+  } 
+  else {
+    if(val > p.peak) p.peak = val;
 
-    p.isHit = false;
-    p.peak = 0;
-    p.lastHitTime = now;
+    if(now >= p.scanEnd){
+      int velocity = map(p.peak, p.threshold, 900, minVelocity, maxVelocity);
+      velocity = constrain(velocity,minVelocity,maxVelocity);
+
+      noteOn(p.lastNote, velocity, p.lastChannel);
+
+      p.maskEnd = now + maskTime;
+      p.scanning = false;
+      p.peak = 0;
+    }
   }
 }
 
-void noteOn(byte pitch, byte velocity, byte channel) {
-  midiEventPacket_t event = {0x09, 0x90 + (channel - 1), pitch, velocity};
+void noteOn(byte pitch, byte velocity, byte channel){
+  midiEventPacket_t event = {0x09, 0x90 | (channel-1), pitch, velocity};
   MidiUSB.sendMIDI(event);
   MidiUSB.flush();
 }
 
-void noteOff(byte pitch, byte channel) {
-  midiEventPacket_t event = {0x08, 0x80 + (channel - 1), pitch, 0};
+void controlChange(byte control, byte value, byte channel){
+  midiEventPacket_t event = {0x0B, 0xB0 | (channel-1), control, value};
   MidiUSB.sendMIDI(event);
   MidiUSB.flush();
 }
